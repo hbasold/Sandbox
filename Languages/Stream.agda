@@ -35,25 +35,26 @@ _at_ : ∀{A} → Stream A → ℕ → A
 s at n = hd (δ n s)
 
 -- Stream equality is bisimilarity
-record _∼ˢ_ {A : Set} (s t : Stream A) : Set where
+record _∼ˢ_ {A : Set} {i : Size} (s t : Stream {i} A) : Set where
   coinductive
   field
     hd≡ : hd s ≡ hd t
-    tl∼ : tl s ∼ˢ tl t
+    tl∼ : ∀ {j : Size< i} → _∼ˢ_ {A} {j} (tl s) (tl t)
 open _∼ˢ_ public
 
-s-bisim-refl : ∀{A} {s : Stream A} → s ∼ˢ s
+s-bisim-refl : ∀{A i} {s : Stream {i} A} → s ∼ˢ s
 hd≡ s-bisim-refl           = refl
-tl∼ (s-bisim-refl {A} {s}) = s-bisim-refl {A} {tl s}
+tl∼ (s-bisim-refl {A} {_} {s}) {j} = s-bisim-refl {A} {j} {tl s}
 
-s-bisim-sym : ∀{A} {s t : Stream A} → s ∼ˢ t → t ∼ˢ s
-hd≡ (s-bisim-sym             p) = sym (hd≡ p)
-tl∼ (s-bisim-sym {A} {s} {t} p) = s-bisim-sym {A} {tl s} {tl t} (tl∼ p)
+s-bisim-sym : ∀{A i} {s t : Stream {i} A} → s ∼ˢ t → t ∼ˢ s
+hd≡ (s-bisim-sym                 p)     = sym (hd≡ p)
+tl∼ (s-bisim-sym {A} {_} {s} {t} p) {j} =
+  s-bisim-sym {A} {j} {tl s} {tl t} (tl∼ p)
 
-s-bisim-trans : ∀{A} {r s t : Stream A} → r ∼ˢ s → s ∼ˢ t → r ∼ˢ t
+s-bisim-trans : ∀{A i} {r s t : Stream {i} A} → r ∼ˢ s → s ∼ˢ t → r ∼ˢ t
 hd≡ (s-bisim-trans                 p q) = trans (hd≡ p) (hd≡ q)
-tl∼ (s-bisim-trans {A} {r} {s} {t} p q)
-  = s-bisim-trans {A} {tl r} {tl s} {tl t} (tl∼ p) (tl∼ q)
+tl∼ (s-bisim-trans {A} {_} {r} {s} {t} p q) {j} =
+  s-bisim-trans {A} {j} {tl r} {tl s} {tl t} (tl∼ p) (tl∼ q)
 
 stream-setoid : ∀{A} → Setoid _ _
 stream-setoid {A} = record
