@@ -145,25 +145,26 @@ lemma-restr-extension-to-length-is-id {A} {s} (a ∷ w) =
     a ∷ w
   ∎
 
-{-
-.lemma-β-indep-of-choice : ∀ {A} {F′ : Causal A Bool} {a b : A} {w : A ⋆} →
-                     β F′ w ≡ β F′ w
-lemma-β-indep-of-choice {A} {F′} {a} {b} {w} =
+.lemma-β-indep-of-choice : ∀ {A} {F′ : Causal A Bool}
+                           {p q : NonEmptyS A} {w : A ⋆} →
+                           β {A} {p} F′ w ≡ β {A} {q} F′ w
+lemma-β-indep-of-choice {A} {F′} {p} {q} {w} =
   let
     open Causal F′
     n = ∥ w ∥
+    x = NonEmptyS.x p
+    y = NonEmptyS.x q
   in begin
-    β a F′ w
+    β {A} {p} F′ w
   ≡⟨ refl ⟩
-    F (w ++ˢ repeat a) at n
-  ≡⟨ caus {n} {(w ++ˢ repeat a)} {(w ++ˢ repeat b)}
+    F (w ++ˢ repeat x) at n
+  ≡⟨ caus {n} {(w ++ˢ repeat x)} {(w ++ˢ repeat y)}
           (trans (lemma-restr-extension-to-length-is-id w)
                  (sym (lemma-restr-extension-to-length-is-id w))) ⟩
-    F (w ++ˢ repeat b) at n
+    F (w ++ˢ repeat y) at n
   ≡⟨ refl ⟩
-    β b F′ w
+    β {A} {q} F′ w
   ∎
--}
 
 lang-iso-caus→ : ∀{A} {p : NonEmptyS A} {L : A ⋆ → Bool} (w : A ⋆) →
                  β {A} {p} (α L) w ≡ L w
