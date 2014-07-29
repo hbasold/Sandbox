@@ -78,6 +78,11 @@ bisim→ext-≡ : ∀ {A} {s t : Stream A} → s ∼ˢ t → ∀ {n} → s at n 
 bisim→ext-≡ p {zero}  = hd≡ p
 bisim→ext-≡ p {suc n} = bisim→ext-≡ (tl∼ p) {n}
 
+ext-≡→bisim : ∀ {A} {s t : Stream A} → (∀ {n : ℕ} → s at n ≡ t at n) → s ∼ˢ t
+hd≡ (ext-≡→bisim p) = p {0}
+tl∼ (ext-≡→bisim {A} {s} {t} p) = {!!}
+-- candidate : ext-≡→bisim {A} {tl s} {tl t} (λ {n} → p {suc n})
+
 -- | Element repetition
 repeat : ∀{A} → A → Stream A
 hd (repeat a) = a
