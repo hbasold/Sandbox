@@ -61,8 +61,8 @@ stream-setoid {A} = record
   { Carrier = Stream A
   ; _≈_ = _∼ˢ_
   ; isEquivalence = record
-    { refl = s-bisim-refl
-    ; sym = s-bisim-sym
+    { refl  = s-bisim-refl
+    ; sym   = s-bisim-sym
     ; trans = s-bisim-trans
     }
   }
@@ -74,14 +74,59 @@ module ∼ˢ-Reasoning where
     open EqR (stream-setoid {A}) public
       hiding (_≡⟨_⟩_) renaming (_≈⟨_⟩_ to _∼ˢ⟨_⟩_; begin_ to beginˢ_; _∎ to _∎ˢ)
 
+-- | As usual, bisimilarity implies equality at every index.
 bisim→ext-≡ : ∀ {A} {s t : Stream A} → s ∼ˢ t → ∀ {n} → s at n ≡ t at n
 bisim→ext-≡ p {zero}  = hd≡ p
 bisim→ext-≡ p {suc n} = bisim→ext-≡ (tl∼ p) {n}
 
-ext-≡→bisim : ∀ {A} {s t : Stream A} → (∀ {n : ℕ} → s at n ≡ t at n) → s ∼ˢ t
-hd≡ (ext-≡→bisim p) = p {0}
-tl∼ (ext-≡→bisim {A} {s} {t} p) = {!!}
--- candidate : ext-≡→bisim {A} {tl s} {tl t} (λ {n} → p {suc n})
+-- Bisimilarity for everywhere defined streams.
+record _∼ˢ∞_ {A : Set} (s t : Stream A) : Set where
+  coinductive
+  field
+    hd≡∞ : hd s ≡ hd t
+    tl∼∞ : (tl s) ∼ˢ∞ (tl t)
+open _∼ˢ∞_ public
+
+s-bisim∞-refl : ∀{A} {s : Stream A} → s ∼ˢ∞ s
+hd≡∞ s-bisim∞-refl           = refl
+tl∼∞ (s-bisim∞-refl {A} {s}) = s-bisim∞-refl {A} {tl s}
+
+s-bisim∞-sym : ∀{A} {s t : Stream A} → s ∼ˢ∞ t → t ∼ˢ∞ s
+hd≡∞ (s-bisim∞-sym             p) = sym (hd≡∞ p)
+tl∼∞ (s-bisim∞-sym {A} {s} {t} p) =
+  s-bisim∞-sym {A} {tl s} {tl t} (tl∼∞ p)
+
+s-bisim∞-trans : ∀{A} {r s t : Stream A} → r ∼ˢ∞ s → s ∼ˢ∞ t → r ∼ˢ∞ t
+hd≡∞ (s-bisim∞-trans                 p q) = trans (hd≡∞ p) (hd≡∞ q)
+tl∼∞ (s-bisim∞-trans {A} {r} {s} {t} p q) =
+  s-bisim∞-trans {A} {tl r} {tl s} {tl t} (tl∼∞ p) (tl∼∞ q)
+
+stream∞-setoid : ∀{A} → Setoid _ _
+stream∞-setoid {A} = record
+  { Carrier = Stream {∞} A
+  ; _≈_ = _∼ˢ∞_
+  ; isEquivalence = record
+    { refl  = s-bisim∞-refl
+    ; sym   = s-bisim∞-sym
+    ; trans = s-bisim∞-trans
+    }
+  }
+
+-- | Bisimilarity on everywhere defined streams implies "infinite" bisimilarity.
+bisim→bisim∞ : ∀ {A} (s t : Stream {∞} A) → s ∼ˢ t → s ∼ˢ∞ t
+hd≡∞ (bisim→bisim∞ _ _ p) = hd≡ p
+tl∼∞ (bisim→bisim∞ s t p) = bisim→bisim∞ (tl s) (tl t) (tl∼ p)
+
+-- | Proof that extensionality, that is equality at every index, implies
+--   bisimilarity.
+--   We cannot prove that extensional equality implies bisimilarity for every
+--   size, since the solver of Agda falls back to ∞ at some points.
+ext-≡→bisim∞ : ∀ {A} (s t : Stream A) → (∀ (n : ℕ) → s at n ≡ t at n) → s ∼ˢ∞ t
+hd≡∞ (ext-≡→bisim∞ _ _ p) = p 0
+tl∼∞ (ext-≡→bisim∞ s t p) = ext-≡→bisim∞ (tl s) (tl t) p'
+  where
+    p' : ∀ (n : ℕ) → (tl s) at n ≡ (tl t) at n
+    p' n = p (suc n)
 
 -- | Element repetition
 repeat : ∀{A} → A → Stream A
