@@ -35,17 +35,13 @@ module CausIsLang where
 
 open import Size
 open import Function
-open import Relation.Binary
 open import Relation.Binary.PropositionalEquality as P
---  using (_≡_; _≢_; _≗_; refl; module ≡-Reasoning)
+  using (_≡_; refl; sym; trans; cong; module ≡-Reasoning)
 open ≡-Reasoning
--- open import Relation.Nullary using (Dec; yes; no)
--- open import Relation.Nullary.Decidable using (⌊_⌋)
 
-open import Data.Bool using (Bool; true; false; if_then_else_)
-open import Data.List using (List; module List; []; _∷_; _++_; length)
-open import Data.Nat using (ℕ; zero; suc; _*_; _≤?_; compare; less; equal; greater)
-open import Data.Product using (_×_; _,_; _,′_; proj₁; proj₂)
+open import Data.Bool using (Bool)
+open import Data.List using (List; module List; []; _∷_; length)
+open import Data.Nat using (ℕ; zero; suc)
 
 open import Stream
 
@@ -69,8 +65,8 @@ record NonEmptyS (A : Set) : Set where
 record Causal (A B : Set) : Set where
   field
     F : Stream {∞} A → Stream {∞} B
-    .caus : ∀ {n : ℕ} {s t : Stream A} →
-            s ↓ n ≡ t ↓ n → (F s) at n ≡ (F t) at n
+    caus : ∀ {n : ℕ} {s t : Stream A} →
+           s ↓ n ≡ t ↓ n → (F s) at n ≡ (F t) at n
 
 lang-to-caus : ∀{A} → (A ⋆ → Bool) → (Stream A → Stream Bool)
 hd (lang-to-caus L s) = L ε
@@ -145,9 +141,9 @@ lemma-restr-extension-to-length-is-id {A} {s} (a ∷ w) =
     a ∷ w
   ∎
 
-.lemma-β-indep-of-choice : ∀ {A} {F′ : Causal A Bool}
-                           {p q : NonEmptyS A} {w : A ⋆} →
-                           β {A} {p} F′ w ≡ β {A} {q} F′ w
+lemma-β-indep-of-choice : ∀ {A} {F′ : Causal A Bool}
+                            {p q : NonEmptyS A} {w : A ⋆} →
+                          β {A} {p} F′ w ≡ β {A} {q} F′ w
 lemma-β-indep-of-choice {A} {F′} {p} {q} {w} =
   let
     open Causal F′
@@ -273,8 +269,8 @@ lemma-length-restr {A} {s} (suc n) =
     suc n
   ∎
 
-.lang-iso-caus← : ∀{A} {p : NonEmptyS A} {F′ : Causal A Bool} {s : Stream A}
-                  (n : ℕ) → Causal.F (α (β F′)) s at n ≡ Causal.F F′ s at n
+lang-iso-caus← : ∀ {A} {p : NonEmptyS A} {F′ : Causal A Bool} {s : Stream A}
+                   (n : ℕ) → Causal.F (α (β F′)) s at n ≡ Causal.F F′ s at n
 lang-iso-caus← {A} {p} {F′} {s} n =
   let
     F = Causal.F F′
