@@ -3,9 +3,11 @@
 open import Level
 open import Data.Product
 open import Data.Bool
+open import Data.Unit renaming (⊤ to One)
+open import Data.Nat hiding (_⊔_)-- using (ℕ, zero, suc)
 open import Function
 open import Relation.Binary.PropositionalEquality as P
-  using (_≡_; refl; sym; trans; cong; module ≡-Reasoning)
+--  using (_≡_; refl; sym; trans; cong; module ≡-Reasoning)
 open ≡-Reasoning
 
 open import Isomorphisms
@@ -113,21 +115,7 @@ iso-testable {A} {B} T I =
 ≃-transport : {A B : Set} → (T : Testable A) → (I : Iso A B) →
               (x y : A) → x ≃〈 T 〉 y →
               (Iso.iso I x) ≃〈 iso-testable T I 〉 (Iso.iso I y)
-≃-transport {A} {B} T₁ I x y p =
-  record { eqProof = f }
-  where
-    T₂ = iso-testable T₁ I
-    f : (φ : Test (iso-testable T₁ I)) → Iso.iso I x ⊨ φ ≡ Iso.iso I y ⊨ φ
-    f ⊤ = refl
-    f ⊥ = refl
-    f (indTest p φs) = {!!}
-      where
---        bar : (o : Obs B (index T₂) (parts T₂) ind) 
-        foo : cotuple (λ i z → z ⊨ φs i) ((f ∘ IsIso.inv (Iso.indeedIso I)) x)
-              ≡ cotuple (λ i z → z ⊨ φs i) ((f ∘ IsIso.inv (Iso.indeedIso I)) y)
-        foo = {!!}
---        foo : (k : Kind) → (k ≡ ind) → 
-    f (coindTest x₁ x₂) = {!!}
+≃-transport = {!!}
 -}
 
 -- | Heterogeneous
@@ -163,3 +151,50 @@ ext {A} {B} TB f g p = record { eqProof = q }
     q ⊥ = refl
     q (indTest () _)
     q (coindTest refl ( a , ψ )) = eqProof (p a) ψ
+
+-- | Make unit type testable
+⊤-testable : Testable One
+index  ⊤-testable = One
+parts  ⊤-testable = λ _ → One
+kind   ⊤-testable = coind
+obs    ⊤-testable = λ { tt  → record { app = λ x → x } }
+obsIso ⊤-testable =
+  record { inv = λ f → app f tt
+         ; isLeftInv = λ a → refl
+         ; isRightInv = λ b → refl
+         }
+partsTestable ⊤-testable = λ i → ⊤-testable
+
+Parts-ℕ : Bool → Set
+Parts-ℕ true = One
+Parts-ℕ false = ℕ
+
+rep-ℕ : ℕ → Σ Bool Parts-ℕ
+rep-ℕ ℕ.zero = (true , tt)
+rep-ℕ (ℕ.suc n) = (false , n)
+
+unrep-ℕ : Σ Bool Parts-ℕ → ℕ
+unrep-ℕ (true , tt) = ℕ.zero
+unrep-ℕ (false , n) = ℕ.suc n
+
+-- | Make naturals testable
+ℕ-testable : Testable ℕ
+index  ℕ-testable = Bool
+parts  ℕ-testable = Parts-ℕ
+kind   ℕ-testable = ind
+obs    ℕ-testable = rep-ℕ
+obsIso ℕ-testable =
+  record { inv = unrep-ℕ
+         ; isLeftInv = li
+         ; isRightInv = ri
+         }
+  where
+    li : (n : ℕ) → unrep-ℕ (rep-ℕ n) ≡ n
+    li ℕ.zero = refl
+    li (ℕ.suc a) = refl
+    ri : (x : Σ Bool Parts-ℕ) → rep-ℕ (unrep-ℕ x) ≡ x
+    ri (true , tt) = refl
+    ri (false , n) = refl
+partsTestable ℕ-testable = λ
+  { true → ⊤-testable
+  ; false → ℕ-testable }
