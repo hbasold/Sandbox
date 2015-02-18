@@ -26,11 +26,11 @@ data Kind : Set where
   ind : Kind
   coind : Kind
 
--- | Make a type observable. An inductive type shall be represented by
---   a coproduct, whereas a coinductive type is represented by a product.
-data Obs (A : Set) (I : Set) (B : I → Set) : Kind → Set where
-  indObs : (f : A → Σ I B) → IsIso f → Obs A I B ind
-  coindObs : (f : A → Π I B) → IsIso f → Obs A I B coind
+--- | Make a type observable. An inductive type shall be represented by
+---   a coproduct, whereas a coinductive type is represented by a product.
+ObsTy : (I : Set) (B : I → Set) → Kind → Set
+ObsTy I B ind = Σ I B
+ObsTy I B coind = Π I B
 
 -- | Make a type testable
 record Testable (A : Set) : Set₁ where
@@ -39,7 +39,8 @@ record Testable (A : Set) : Set₁ where
     index : Set
     parts : index → Set
     kind : Kind
-    obs : Obs A index parts kind
+    obs : A → ObsTy index parts kind
+    obsIso : IsIso obs
     partsTestable : (i : index) → Testable (parts i)
 
 open Testable public
@@ -61,12 +62,12 @@ x ⊨ ⊤ = true
 x ⊨ ⊥ = false
 _⊨_ {A} {T} x (indTest p φs) = indH (kind T) p (obs T)
   where
-    indH : (k : Kind) → (k ≡ ind) → Obs A (index T) (parts T) k → Bool
-    indH ind refl (indObs o _) = cotuple (λ i y → y ⊨ φs i) (o x)
+    indH : (k : Kind) → (k ≡ ind) → (A → ObsTy (index T) (parts T) k) → Bool
+    indH ind refl o = cotuple (λ i y → y ⊨ φs i) (o x)
 _⊨_ {A} {T} x (coindTest p (i , φ) ) = coH (kind T) p (obs T)
   where
-    coH : (k : Kind) → (k ≡ coind) → Obs A (index T) (parts T) k → Bool
-    coH coind refl (coindObs o _) = app (o x) i ⊨ φ
+    coH : (k : Kind) → (k ≡ coind) → (A → ObsTy (index T) (parts T) k) → Bool
+    coH coind refl o = app (o x) i ⊨ φ
 
 -- | Observational equivalence: terms are equal if they satisfy the same tests.
 record _≃〈_〉_ {A : Set} (x : A) (T : Testable A) (y : A) : Set₁ where
@@ -103,16 +104,10 @@ iso-testable {A} {B} T I =
   { index = index T
   ; parts = parts T
   ; kind = kind T
-  ; obs = foo (kind T) (obs T)
-  ; partsTestable = partsTestable T }
-  where
-    foo : (k : Kind) → Obs A (index T) (parts T) k → Obs B (index T) (parts T) k
-    foo ind (indObs f i) =
-      indObs (f ∘ IsIso.inv (Iso.indeedIso I))
-             (iso-comp (iso-rev (Iso.indeedIso I)) i)
-    foo coind (coindObs f i) =
-      coindObs (f ∘ IsIso.inv (Iso.indeedIso I))
-               (iso-comp (iso-rev (Iso.indeedIso I)) i)
+  ; obs = ((obs T) ∘ IsIso.inv (Iso.indeedIso I))
+  ; obsIso = (iso-comp (iso-rev (Iso.indeedIso I)) (obsIso T))
+  ; partsTestable = partsTestable T
+  }
 
 {-
 ≃-transport : {A B : Set} → (T : Testable A) → (I : Iso A B) →
@@ -142,7 +137,6 @@ record _~〈_∥_〉_ {A B : Set} (x : A) (T : Testable A) (I : Iso A B) (y : A)
 
 open _~〈_∥_〉_ public
 
-
 ------- Examples ---------
 
 -- | Functions are testable if their codomain is
@@ -152,10 +146,10 @@ FunTestable {A} {B} TB =
   { index = A
   ; parts = λ _ → B
   ; kind = coind
-  ; obs = coindObs (λ f → record { app = f })
-                   (record { inv = app
-                           ; isLeftInv = λ a → refl
-                           ; isRightInv = λ b → refl })
+  ; obs = λ f → record { app = f }
+  ; obsIso = (record { inv = app
+                     ; isLeftInv = λ a → refl
+                     ; isRightInv = λ b → refl })
   ; partsTestable = λ _ → TB }
 
 -- | We get extensionality for functions under observational equivalence.
