@@ -1,26 +1,44 @@
+-- | In this module, we implement a decision procedure for observational
+-- equivalence of programs of a very simple language. This language allows
+-- programs of finitely-indexed, inductive and coinductive type.
+-- A program consists of a definition block and a term, where a definition block
+-- contains definitions of the form f : A = D for some symbol f, type A and
+-- a body D. A body, in turn, is either of the form { ξ ↦ t } or
+-- { π₁ ↦ t₁; π₂ ↦ t₂ } for terms t, t₁, t₂. These are copattern abstractions
+-- á la Abel et al.
+module DecideEquiv where
+
 import Data.Map as Map
 import qualified Data.Set as Set
 import Data.Set (Set)
 import Control.Monad.Reader
-import Control.Monad.Error
+import Control.Monad.Except
 
 type TyVar = String
 type SVar = String
 type Var = String
 
+-- | Possible types:
+-- A ::= X | A + A | μX.A | A × A | νX.A
 data Type = PT TyVar
           | Sum Type Type
           | Lfp TyVar Type
           | Prod Type Type
           | Gfp TyVar Type
-            deriving (Show, Eq, Ord)
+            deriving (Eq, Ord)
 
+-- | Index of coproduct injections and product projections
 data Idx = L | R deriving (Eq, Ord)
 
 instance Show Idx where
     show L = "1"
     show R = "2"
 
+-- | Allowed terms:
+-- t ::= f | κ₁ t | κ₂ t | α t | π₁ t | π₂ t | ξ t
+-- where f is a symbol defined in a definition block,
+-- κ₁ is the first coproduct injection, α the lfp injection,
+-- π₁ the first product projection and ξ the gfp projection.
 data Term = Sym SVar Type
           | Inj Idx Term Type
           | In Term Type
@@ -28,24 +46,66 @@ data Term = Sym SVar Type
           | Out Term Type
             deriving (Eq, Ord)
 
-instance Show Term where
-    show (Sym x _) = x
-    show (Inj i t _) = "inj" ++ show i ++ " (" ++ show t ++ ")"
-    show (In t _) = "in (" ++ show t ++ ")"
-    show (Prj i t _) = "prj" ++ show i ++ " (" ++ show t ++ ")"
-    show (Out t _) = "out (" ++ show t ++ ")"
-
+-- | Body D of a definition f : A = D. Note that we allow only
+-- one-layer copatterns for products and gfps.
 data Body = ProdAbs Term Term
           | GfpAbs Term
             deriving Show
 
+-- | Definition block that assigns to symbols f their type
+-- and body.
 type Defs = Map SVar (Type, Body)
+
+-- | Programs are terms using symbols from a definition block.
 data Prog = Prog Defs Term
 
--- Bring terms into weak head normal form
+------ Pretty printing ----
+
+instance Show Type where
+    showsPrec _ (PT x) = showString x
+    showsPrec p (Sum a b) = showParen (p > 10) $
+                            showsPrec 10 a .
+                            showString " + " .
+                            showsPrec 10 b
+    showsPrec p (Lfp x a) = showParen (p > 0) $
+                            showString "μ" .
+                            showString x .
+                            showString ". " .
+                            showsPrec 0 a
+    showsPrec p (Prod a b) = showParen (p > 10) $
+                             showsPrec 11 a .
+                             showString " × " .
+                             showsPrec 11 b
+    showsPrec p (Gfp x a) = showParen (p > 0) $
+                            showString "ν" .
+                            showString x .
+                            showString ". " .
+                            showsPrec 0 a
+subscriptIdx L = "₁"
+subscriptIdx R = "₂"
+
+instance Show Term where
+    showsPrec _ (Sym x _) = showString x
+    showsPrec p (Inj i t _) = showParen (p > 0) $
+                              showString ("κ" ++ subscriptIdx i ++ " ") .
+                              showsPrec 1 t
+    showsPrec p (In t _) = showParen (p > 0) $
+                           showString "α " .
+                           showsPrec 1 t
+    showsPrec p (Prj i t _) = showParen (p > 0) $
+                              showString ("π" ++ subscriptIdx i ++ " ") .
+                              showsPrec 1 t
+    showsPrec p (Out t _) = showParen (p > 0) $
+                            showString "ξ " .
+                            showsPrec 1 t
+
+-- | Evaluation context into which we can put terms.
 data EvCtx = PrjC Idx
            | OutC
 
+-- | Bring terms into principal weak head normal form, that is,
+-- into "κ₁ t", "κ₁ t" or "α t" for inductive, and into "f" for coinductive
+-- types. To achieve this, we contract applications of projections.
 reduce :: Defs -> Term -> Term
 reduce d t@(Sym f _) = t
 reduce d t@(Inj _ _ _) = t
@@ -81,9 +141,10 @@ reduceSym d f OutC =
             GfpAbs t' -> t'
             _ -> error $ "Typing error: tried to do transition from non-gfp term"
 
--- Decide whether two terms are observationally equivalent
+-- | Type-indexed relations on terms.
 type Rel = Map Type (Set (Term, Term))
 
+-- | Tests that we can make on programs/terms.
 data Test = Top
           | Bot
           | InjT Test Test
@@ -92,18 +153,20 @@ data Test = Top
           | OutT Test
 
 instance Show Test where
-    show Top = "T"
-    show Bot = "F"
+    show Top = "⊤"
+    show Bot = "⟂"
     show (InjT t1 t2) = "[" ++ show t1 ++ "," ++ show t2 ++ "]"
-    show (InT t) = "unf " ++ show t
-    show (PrjT i t) = "[" ++ show i ++ "]" ++ " " ++ show t
-    show (OutT t) = "[out]" ++ " " ++ show t
+    show (InT t) = "α⁻¹ " ++ show t
+    show (PrjT i t) = "[π" ++ subscriptIdx i ++ "]" ++ " " ++ show t
+    show (OutT t) = "[ξ]" ++ " " ++ show t
 
-
+-- | While trying to build a bisimulation, can abort with an error or a test.
+-- In the latter case, the given terms were not observationally equivalent.
 data Abort = Error String
            | InEquiv Test
              deriving Show
 
+-- | Internal monad for equivalence check.
 type M a = ReaderT Defs (Either Abort) a
 
 lookupSym :: SVar -> M Body
@@ -113,13 +176,45 @@ lookupSym f =
          Nothing -> throwError $ Error $ "Unknown symbol " ++ f
          Just (_, b) -> return b
 
+-- | Once we found that two terms disagree at some point, we need to construct
+-- test that witnesses this fact. While going up, we extend the found test to
+-- account for the path we had to take to get to the point of disagreement.
 updateTest :: (Test -> Test) -> M a -> M a
 updateTest tc m =
     catchError m (\e -> case e of
                           Error s -> throwError $ Error s
                           InEquiv t -> throwError $ InEquiv $ tc t)
 
--- Monontone in the given relation
+-- | Checks whether the given terms are already related.
+inBisim :: Type -> Term -> Term -> Rel -> Bool
+inBisim a t1 t2 b =
+    case Map.lookup a b of
+      Nothing -> False
+      Just s -> Set.member (t1, t2) s
+
+-- | Decide whether two terms t₁,t₂ : A are observationally equivalent, we
+-- denote this by t₁ ~ t₂.
+--
+-- We assume that if t₁ and t₂ are related by b, then b is closed under term
+-- derivations. For example, if t₁,t₂ : A₁ × A₂, then there are s₁,s₂ : A₁ with
+-- π₁ tk ->> sk that are related by b. Analogously for the other types, details
+-- are in the paper.
+--
+-- The procedure works as follows. Whenever we have a term in PWHNF, we check
+-- whether it is already in the given relation and by assumption it is already
+-- closed as bisimulation up-to convertibility.
+-- Otherwise, we have three cases:
+-- 1. Both terms are signature symbols. Since they are of the same type, both
+--    must have a body for, say, gfps D₁ = { ξ ↦ s } and D₂ = { ξ ↦ r }.
+--    Then we add (t₁,t₂) to b and check recursively  s ~ r.
+--    If this fails with a test φ, then we return the test [ξ] φ, otherwise the
+--    resulting bisimulation.
+-- 2. Both terms are of inductive type, say a coproduct, and in WHNF "κi s₁" and
+--    "κi s₂". If i /= j, then t₁ /~ t₂ and we abort with the test [⊤, ⟂] that
+--    distinguishes them. Otherwise, we add (t₁, t₂) to b and continue
+--    recursively to check s₁ ~ s₂.
+-- 3. The terms are not in PWHNF. Then we just reduce them to PWHNF and continue
+--    from there.
 createBisimCand :: Term -> Term -> Rel -> M Rel
 createBisimCand t1@(Sym x a) t2@(Sym y _) b0 =
     if inBisim a t1 t2 b0
@@ -140,6 +235,7 @@ createBisimCand t1@(Sym x a) t2@(Sym y _) b0 =
     where
       proj i = updateTest (PrjT i)
       out = updateTest OutT
+
 createBisimCand t1@(Inj i r1 a) t2@(Inj j r2 _) b0 =
     if i == j
     then if inBisim a t1 t2 b0
@@ -160,20 +256,18 @@ createBisimCand t1@(In s1 a) t2@(In s2 _) b0 =
         let b0' = Map.unionWith Set.union b0 $
                      Map.singleton a $ Set.singleton (t1, t2)
         in updateTest InT $ createBisimCand s1 s2 b0'
+
 createBisimCand t1 t2 b0 =
     do d <- ask
        let t1' = reduce d t1
            t2' = reduce d t2
        createBisimCand t1' t2' b0
 
-inBisim :: Type -> Term -> Term -> Rel -> Bool
-inBisim a t1 t2 r =
-    case Map.lookup a r of
-      Nothing -> False
-      Just s -> Set.member (t1, t2) s
-
-bisimCand :: Defs -> Term -> Term -> Rel -> Either Abort Rel
-bisimCand d t1 t2 b = runReaderT (createBisimCand t1 t2 b) d
+-- | If the given terms are observationally equivalent, then we return a
+-- bisimulation up-to convertibility that relates these terms, otherwise we
+-- abort with a test that distinguishes them.
+bisimCand :: Defs -> Term -> Term -> Either Abort Rel
+bisimCand d t1 t2 = runReaderT (createBisimCand t1 t2 Map.empty) d
 
 -- Examples --
 
@@ -185,13 +279,13 @@ nat = Lfp "y" $ Sum oneT (PT "y")
 list :: Type -> Type
 list a = Lfp "y" $ Sum oneT (Prod a (PT "y"))
 stream :: Type -> Type
-stream a = Gfp "y" $ Prod a (PT "y")
+stream a = Gfp "z" $ Prod a (PT "z")
 
 -- Terms & Programs
 unitDefs :: Defs
-unitDefs = singleton "f" (oneT, GfpAbs $ Sym "f" oneT)
+unitDefs = singleton "〈〉" (oneT, GfpAbs $ Sym "〈〉" oneT)
 unit :: Term
-unit = Sym "f" oneT
+unit = Sym "〈〉" oneT
 unitProg :: Prog
 unitProg = Prog unitDefs unit
 
@@ -218,7 +312,6 @@ oDefs = fromList [
         ]
         `Map.union` unitDefs
 
-{-
 s1 = Out o1 (Prod nat $ stream nat)
 s2 = Out o2 (Prod nat $ stream nat)
 r1 = Prj L s1 nat
@@ -227,10 +320,9 @@ u1 = Prj R s1 (stream nat)
 u2 = Prj R s2 (stream nat)
 zo = Out z (Prod nat $ stream nat)
 zh = Prj L zo nat
--}
 
 -- As expected:
--- bisimCand oDefs o1 o2 Map.empty
+-- bisimCand oDefs o1 o2
 -- results into the correct bisimulation.
--- bisimCand oDefs o1 z Map.empty
--- results into a test.
+-- bisimCand oDefs o1 z
+-- results into a test that distinguishes o1 and z.
