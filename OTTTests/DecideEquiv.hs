@@ -27,6 +27,14 @@ data Type = PT TyVar
           | Gfp TyVar Type
             deriving (Eq, Ord)
 
+-- | subst a x b substitutes a for x in b. Assumption: a is closed.
+subst :: Type -> TyVar -> Type -> Type
+subst a x (PT y) = if x == y then a else PT y
+subst a x (Sum b1 b2) = Sum (subst a x b1) (subst a x b2)
+subst a x b@(Lfp y c) = if x == y then b else (Lfp y (subst a x c))
+subst a x (Prod b1 b2) = Prod (subst a x b1) (subst a x b2)
+subst a x b@(Gfp y c) = if x == y then b else (Gfp y (subst a x c))
+
 -- | Index of coproduct injections and product projections
 data Idx = L | R deriving (Eq, Ord)
 
@@ -46,11 +54,21 @@ data Term = Sym SVar Type
           | Out Term Type
             deriving (Eq, Ord)
 
+getType :: Term -> Type
+getType (Sym _ a) = a
+getType (Inj _ _ a) = a
+getType (In _ a) = a
+getType (Prj _ _ a) = a
+getType (Out _ a) = a
+
 -- | Body D of a definition f : A = D. Note that we allow only
 -- one-layer copatterns for products and gfps.
 data Body = ProdAbs Term Term
           | GfpAbs Term
-            deriving Show
+
+instance Show Body where
+    show (ProdAbs t1 t2) = "{π₁ ↦ " ++ show t1 ++ "; π₂ ↦ " ++ show t2 ++ "}"
+    show (GfpAbs t) = "{ξ ↦ " ++ show t ++ "}"
 
 -- | Definition block that assigns to symbols f their type
 -- and body.
@@ -294,6 +312,19 @@ repNat n | n < 0 = undefined
          | n == 0 = In (Inj L unit (Sum oneT nat)) nat
          | n > 0 = In (Inj R (repNat (n-1)) (Sum oneT nat)) nat
 
+prj :: Idx -> Term -> Term
+prj L t = case getType t of
+            Prod a1 _ -> Prj L t a1
+            _ -> error $ "Type error: applying projection to non-product type"
+prj R t = case getType t of
+            Prod _ a2 -> Prj R t a2
+            _ -> error $ "Type error: applying projection to non-product type"
+
+out :: Term -> Term
+out t = case getType t of
+          Gfp x a -> Out t (subst (Gfp x a) x a)
+          _ -> error $ "Type error: applying ξ to non-gfp type"
+
 o1, o2, o3, z :: Term
 o1 = Sym "o1" (stream nat)
 o2 = Sym "o2" (stream nat)
@@ -312,14 +343,14 @@ oDefs = fromList [
         ]
         `Map.union` unitDefs
 
-s1 = Out o1 (Prod nat $ stream nat)
-s2 = Out o2 (Prod nat $ stream nat)
-r1 = Prj L s1 nat
-r2 = Prj L s2 nat
-u1 = Prj R s1 (stream nat)
-u2 = Prj R s2 (stream nat)
-zo = Out z (Prod nat $ stream nat)
-zh = Prj L zo nat
+s1 = out o1
+s2 = out o2
+r1 = prj L s1
+r2 = prj L s2
+u1 = prj R s1
+u2 = prj R s2
+zo = out z
+zh = prj L zo
 
 -- As expected:
 -- bisimCand oDefs o1 o2
