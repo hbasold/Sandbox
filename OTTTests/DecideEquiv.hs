@@ -121,25 +121,46 @@ instance Show Term where
 data EvCtx = PrjC Idx
            | OutC
 
--- | Bring terms into principal weak head normal form, that is,
--- into "κ₁ t", "κ₁ t" or "α t" for inductive, and into "f" for coinductive
--- types. To achieve this, we contract applications of projections.
-reduce :: Defs -> Term -> Term
-reduce d t@(Sym f _) = t
-reduce d t@(Inj _ _ _) = t
-reduce d t@(In _ _) = t
-reduce d (Prj i t a) =
-    let t' = reduce d t
-        t'' = case t' of
-                Sym f _ -> reduceSym d f (PrjC i)
-                _ -> error "Could not reduce to PWHNF"
-    in reduce d t''
-reduce d (Out t a) =
-    let t' = reduce d t
-        t'' = case t' of
-                Sym f _ -> reduceSym d f OutC
-                _ -> error "Could not reduce to PWHNF"
-    in reduce d t''
+
+-- | Type-indexed predicates on terms.
+type Pred = Map Type (Set Term)
+
+
+inPred :: (Term, Type) -> Pred -> Bool
+inPred (t, a) p =
+    case Map.lookup a p of
+      Nothing -> False
+      Just q -> t `Set.member` q
+
+reduceCheckCoind :: Defs -> Term -> Type -> Term -> Pred -> EvCtx ->
+                    Either Term Pred
+reduceCheckCoind d t a r p e =
+    if (t, a) `inPred` p
+    then Right p
+    else let p' = Map.insertWith (Set.union) a (Set.singleton t) p
+         in reduceCheckCoindCont d r p' e
+
+reduceCheckCoindCont d r p' e =
+    let u = reduceCheck d r p'
+    in case u of
+         Left r' ->
+             case r' of
+               Sym f _ ->
+                   let t' = reduceSym d f e
+                   in reduceCheck d t' p'
+               _ -> error "Could not reduce to PWHNF"
+         Right p'' -> Right p''
+
+-- | Tries to reduce a term to PWHNF and tracks a predicate that
+-- witnesses whether the given terms diverges under the reduction relation.
+-- If this happens, we abort and return the predicate.
+reduceCheck :: Defs -> Term -> Pred -> Either Term Pred
+reduceCheck d t@(Sym f a) p =
+    if (t, a) `inPred` p then Right p else Left t
+reduceCheck d t@(Inj _ _ _) p = Left t
+reduceCheck d t@(In _ _) p = Left t
+reduceCheck d t@(Prj i r a) p = reduceCheckCoind d t a r p (PrjC i)
+reduceCheck d t@(Out r a) p = reduceCheckCoind d t a r p OutC
 
 reduceSym d f (PrjC i) =
     case Map.lookup f d of
@@ -158,6 +179,17 @@ reduceSym d f OutC =
           case b of
             GfpAbs t' -> t'
             _ -> error $ "Typing error: tried to do transition from non-gfp term"
+
+-- | Bring terms into principal weak head normal form, that is,
+-- into "κ₁ t", "κ₁ t" or "α t" for inductive, and into "f" for coinductive
+-- types. To achieve this, we contract applications of projections.
+-- This function may fail if there is no PWHNF, which can be caused either by t
+-- diverging or by a typing error.
+reduce :: Defs -> Term -> Term
+reduce d t =
+    case reduceCheck d t Map.empty of
+      Left t' -> t'
+      Right _ -> error $ show t ++ " has no PWHNF since it diverges."
 
 -- | Type-indexed relations on terms.
 type Rel = Map Type (Set (Term, Term))
@@ -227,6 +259,7 @@ inBisim a t1 t2 b =
 --    Then we add (t₁,t₂) to b and check recursively  s ~ r.
 --    If this fails with a test φ, then we return the test [ξ] φ, otherwise the
 --    resulting bisimulation.
+--    Analogously, we proceed for product types.
 -- 2. Both terms are of inductive type, say a coproduct, and in WHNF "κi s₁" and
 --    "κi s₂". If i /= j, then t₁ /~ t₂ and we abort with the test [⊤, ⟂] that
 --    distinguishes them. Otherwise, we add (t₁, t₂) to b and continue
@@ -357,3 +390,38 @@ zh = prj L zo
 -- results into the correct bisimulation.
 -- bisimCand oDefs o1 z
 -- results into a test that distinguishes o1 and z.
+
+
+-- bisimCand bsDefs bs bs does not terminate because bs is not observationally
+-- normalising.
+bs :: Term
+bs = Sym "bs" (stream nat)
+bsDefs :: Defs
+bsDefs = fromList [
+          ("bs", (stream nat,
+                  GfpAbs (Out (Sym "bs" (stream nat)) (Prod nat (stream nat)))))
+        ]
+
+-- reduce bsDefs bs1 diverges
+bs1 = Out bs (Prod nat $ stream nat)
+
+funky :: Term
+funky = Sym "funky" (stream nat)
+funkyDefs :: Defs
+funkyDefs = fromList [
+             ("funky", (stream nat,
+                        GfpAbs (out $ prj R (Sym "f" (Prod nat (stream nat))))
+                       )
+             ),
+             ("f", (Prod nat $ stream nat,
+                   ProdAbs
+                   (repNat 0)
+                   (prj R $ out $ prj R $ Sym "f" (Prod nat (stream nat)))
+                  )
+             )
+            ]
+-- | This would diverge to
+-- ξ funky -> ξ π₂ f -> ξ π₂ ξ π₂ f -> ...
+-- But reduce can detect this now in the fly.
+funky1 :: Term
+funky1 = out funky
