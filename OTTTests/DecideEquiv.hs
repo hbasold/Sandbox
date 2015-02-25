@@ -6,7 +6,12 @@
 -- a body D. A body, in turn, is either of the form { ξ ↦ t } or
 -- { π₁ ↦ t₁; π₂ ↦ t₂ } for terms t, t₁, t₂. These are copattern abstractions
 -- á la Abel et al.
-module DecideEquiv where
+module DecideEquiv
+    (TyVar, SVar, Var, Type(..),
+     Idx(..), Term(..), prj, out, Body(..), Defs, Prog(..),
+     Pred, reduceCheck, reduce, Rel, bisimCand
+    )
+where
 
 import Data.Map as Map
 import qualified Data.Set as Set
@@ -60,6 +65,20 @@ getType (Inj _ _ a) = a
 getType (In _ a) = a
 getType (Prj _ _ a) = a
 getType (Out _ a) = a
+
+prj :: Idx -> Term -> Term
+prj L t = case getType t of
+            Prod a1 _ -> Prj L t a1
+            _ -> error $ "Type error: applying projection to non-product type"
+prj R t = case getType t of
+            Prod _ a2 -> Prj R t a2
+            _ -> error $ "Type error: applying projection to non-product type"
+
+out :: Term -> Term
+out t = case getType t of
+          Gfp x a -> Out t (subst (Gfp x a) x a)
+          _ -> error $ "Type error: applying ξ to non-gfp type"
+
 
 -- | Body D of a definition f : A = D. Note that we allow only
 -- one-layer copatterns for products and gfps.
@@ -121,10 +140,8 @@ instance Show Term where
 data EvCtx = PrjC Idx
            | OutC
 
-
 -- | Type-indexed predicates on terms.
 type Pred = Map Type (Set Term)
-
 
 inPred :: (Term, Type) -> Pred -> Bool
 inPred (t, a) p =
@@ -132,36 +149,34 @@ inPred (t, a) p =
       Nothing -> False
       Just q -> t `Set.member` q
 
+-- | Tries to reduce a term to PWHNF and tracks a predicate that
+-- witnesses whether the given terms diverges under the reduction relation.
+-- If this happens, we abort and return the predicate.
+reduceCheck :: Defs -> Term -> Pred -> Either Pred Term
+reduceCheck d t@(Sym f a) p =
+    if (t, a) `inPred` p then Left p else return t
+reduceCheck d t@(Inj _ _ _) p = return t
+reduceCheck d t@(In _ _) p = return t
+reduceCheck d t@(Prj i r a) p = reduceCheckCoind d t a r p (PrjC i)
+reduceCheck d t@(Out r a) p = reduceCheckCoind d t a r p OutC
+
 reduceCheckCoind :: Defs -> Term -> Type -> Term -> Pred -> EvCtx ->
-                    Either Term Pred
+                    Either Pred Term
 reduceCheckCoind d t a r p e =
     if (t, a) `inPred` p
-    then Right p
+    then Left p
     else let p' = Map.insertWith (Set.union) a (Set.singleton t) p
          in reduceCheckCoindCont d r p' e
-
-reduceCheckCoindCont d r p' e =
-    let u = reduceCheck d r p'
-    in case u of
-         Left r' ->
+    where
+      reduceCheckCoindCont d r p' e =
+          do r' <- reduceCheck d r p'
              case r' of
                Sym f _ ->
                    let t' = reduceSym d f e
                    in reduceCheck d t' p'
                _ -> error "Could not reduce to PWHNF"
-         Right p'' -> Right p''
 
--- | Tries to reduce a term to PWHNF and tracks a predicate that
--- witnesses whether the given terms diverges under the reduction relation.
--- If this happens, we abort and return the predicate.
-reduceCheck :: Defs -> Term -> Pred -> Either Term Pred
-reduceCheck d t@(Sym f a) p =
-    if (t, a) `inPred` p then Right p else Left t
-reduceCheck d t@(Inj _ _ _) p = Left t
-reduceCheck d t@(In _ _) p = Left t
-reduceCheck d t@(Prj i r a) p = reduceCheckCoind d t a r p (PrjC i)
-reduceCheck d t@(Out r a) p = reduceCheckCoind d t a r p OutC
-
+reduceSym :: Defs -> SVar -> EvCtx -> Term
 reduceSym d f (PrjC i) =
     case Map.lookup f d of
       Nothing -> error $ "Undefined symbol: " ++ f
@@ -188,8 +203,8 @@ reduceSym d f OutC =
 reduce :: Defs -> Term -> Term
 reduce d t =
     case reduceCheck d t Map.empty of
-      Left t' -> t'
-      Right _ -> error $ show t ++ " has no PWHNF since it diverges."
+      Left _ -> error $ show t ++ " has no PWHNF since it diverges."
+      Right t' -> t'
 
 -- | Type-indexed relations on terms.
 type Rel = Map Type (Set (Term, Term))
@@ -319,109 +334,3 @@ createBisimCand t1 t2 b0 =
 -- abort with a test that distinguishes them.
 bisimCand :: Defs -> Term -> Term -> Either Abort Rel
 bisimCand d t1 t2 = runReaderT (createBisimCand t1 t2 Map.empty) d
-
--- Examples --
-
--- Types
-oneT :: Type
-oneT = Gfp "x" $ PT "x"
-nat :: Type
-nat = Lfp "y" $ Sum oneT (PT "y")
-list :: Type -> Type
-list a = Lfp "y" $ Sum oneT (Prod a (PT "y"))
-stream :: Type -> Type
-stream a = Gfp "z" $ Prod a (PT "z")
-
--- Terms & Programs
-unitDefs :: Defs
-unitDefs = singleton "〈〉" (oneT, GfpAbs $ Sym "〈〉" oneT)
-unit :: Term
-unit = Sym "〈〉" oneT
-unitProg :: Prog
-unitProg = Prog unitDefs unit
-
-repNat :: Int -> Term
-repNat n | n < 0 = undefined
-         | n == 0 = In (Inj L unit (Sum oneT nat)) nat
-         | n > 0 = In (Inj R (repNat (n-1)) (Sum oneT nat)) nat
-
-prj :: Idx -> Term -> Term
-prj L t = case getType t of
-            Prod a1 _ -> Prj L t a1
-            _ -> error $ "Type error: applying projection to non-product type"
-prj R t = case getType t of
-            Prod _ a2 -> Prj R t a2
-            _ -> error $ "Type error: applying projection to non-product type"
-
-out :: Term -> Term
-out t = case getType t of
-          Gfp x a -> Out t (subst (Gfp x a) x a)
-          _ -> error $ "Type error: applying ξ to non-gfp type"
-
-o1, o2, o3, z :: Term
-o1 = Sym "o1" (stream nat)
-o2 = Sym "o2" (stream nat)
-o3 = Sym "o3" (stream nat)
-z = Sym "z" (stream nat)
-oDefs :: Defs
-oDefs = fromList [
-         ("o1", (stream nat, GfpAbs (Sym "o1Out" $ Prod nat (stream nat)))),
-         ("o1Out", (stream nat, ProdAbs (repNat 1) (Sym "o1" $ stream nat))),
-         ("o2", (stream nat, GfpAbs (Sym "o2Out" $ Prod nat (stream nat)))),
-         ("o2Out", (stream nat, ProdAbs (repNat 1) (Sym "o3" $ stream nat))),
-         ("o3", (stream nat, GfpAbs (Sym "o3Out" $ Prod nat (stream nat)))),
-         ("o3Out", (stream nat, ProdAbs (repNat 1) (Sym "o2" $ stream nat))),
-         ("z", (stream nat, GfpAbs (Sym "zOut" $ Prod nat (stream nat)))),
-         ("zOut", (stream nat, ProdAbs (repNat 0) (Sym "z" $ stream nat)))
-        ]
-        `Map.union` unitDefs
-
-s1 = out o1
-s2 = out o2
-r1 = prj L s1
-r2 = prj L s2
-u1 = prj R s1
-u2 = prj R s2
-zo = out z
-zh = prj L zo
-
--- As expected:
--- bisimCand oDefs o1 o2
--- results into the correct bisimulation.
--- bisimCand oDefs o1 z
--- results into a test that distinguishes o1 and z.
-
-
--- bisimCand bsDefs bs bs does not terminate because bs is not observationally
--- normalising.
-bs :: Term
-bs = Sym "bs" (stream nat)
-bsDefs :: Defs
-bsDefs = fromList [
-          ("bs", (stream nat,
-                  GfpAbs (Out (Sym "bs" (stream nat)) (Prod nat (stream nat)))))
-        ]
-
--- reduce bsDefs bs1 diverges
-bs1 = Out bs (Prod nat $ stream nat)
-
-funky :: Term
-funky = Sym "funky" (stream nat)
-funkyDefs :: Defs
-funkyDefs = fromList [
-             ("funky", (stream nat,
-                        GfpAbs (out $ prj R (Sym "f" (Prod nat (stream nat))))
-                       )
-             ),
-             ("f", (Prod nat $ stream nat,
-                   ProdAbs
-                   (repNat 0)
-                   (prj R $ out $ prj R $ Sym "f" (Prod nat (stream nat)))
-                  )
-             )
-            ]
--- | This would diverge to
--- ξ funky -> ξ π₂ f -> ξ π₂ ξ π₂ f -> ...
--- But reduce can detect this now in the fly.
-funky1 :: Term
-funky1 = out funky
