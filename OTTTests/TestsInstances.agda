@@ -25,10 +25,17 @@ FunTestable {A} {B} TB =
   ; parts = λ _ → B
   ; kind = coind
   ; obs = λ f → record { app = f }
+  ; partsTestable = λ _ → TB
+  }
+
+FunIsoTestable : {A B : Set} → IsoTestable B → IsoTestable (A → B)
+FunIsoTestable T =
+  record
+  { testable = FunTestable (testable T)
   ; obsIso = (record { inv = app
                      ; isLeftInv = λ a → refl
                      ; isRightInv = λ b → refl })
-  ; partsTestable = λ _ → TB }
+  }
 
 -- | We get extensionality for functions under observational equivalence.
 ext : {A B : Set} → (T : Testable B) →
@@ -47,12 +54,18 @@ index  ⊤-testable = One
 parts  ⊤-testable = λ _ → One
 kind   ⊤-testable = coind
 obs    ⊤-testable = λ { tt  → record { app = λ x → x } }
-obsIso ⊤-testable =
-  record { inv = λ f → app f tt
-         ; isLeftInv = λ a → refl
-         ; isRightInv = λ b → refl
-         }
 partsTestable ⊤-testable = λ i → ⊤-testable
+
+⊤-IsoTestable : IsoTestable One
+⊤-IsoTestable =
+  record
+  { testable = ⊤-testable
+  ; obsIso =
+    record { inv = λ f → app f tt
+           ; isLeftInv = λ a → refl
+           ; isRightInv = λ b → refl
+           }
+  }
 
 -- | Obs. equiv. is a congruence on ⊤.
 ≃-cong-⊤ : {A : Set} → {T : Testable A} → {x y : One} →
@@ -77,11 +90,20 @@ index  ℕ-testable = Bool
 parts  ℕ-testable = Parts-ℕ
 kind   ℕ-testable = ind
 obs    ℕ-testable = rep-ℕ
-obsIso ℕ-testable =
-  record { inv = unrep-ℕ
-         ; isLeftInv = li
-         ; isRightInv = ri
-         }
+partsTestable ℕ-testable = λ
+  { true → ⊤-testable
+  ; false → ℕ-testable }
+
+ℕ-IsoTestable : IsoTestable ℕ
+ℕ-IsoTestable =
+  record
+  { testable = ℕ-testable
+  ; obsIso =
+    record { inv = unrep-ℕ
+           ; isLeftInv = li
+           ; isRightInv = ri
+           }
+  }
   where
     li : (n : ℕ) → unrep-ℕ (rep-ℕ n) ≡ n
     li ℕ.zero = refl
