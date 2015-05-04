@@ -111,9 +111,6 @@ partsTestable ℕ-testable = λ
     ri : (x : Σ Bool Parts-ℕ) → rep-ℕ (unrep-ℕ x) ≡ x
     ri (true , tt) = refl
     ri (false , n) = refl
-partsTestable ℕ-testable = λ
-  { true → ⊤-testable
-  ; false → ℕ-testable }
 
 ¬zero→suc : (n : ℕ) → n ≢ zero → ∃ (λ m → n ≡ suc m)
 ¬zero→suc n p with n ≟ zero
