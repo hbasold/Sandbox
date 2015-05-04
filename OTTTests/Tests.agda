@@ -78,33 +78,33 @@ sat coind (i , φ) o = app o i ⊨ φ
 
 
 -- | Observational equivalence: terms are equal if they satisfy the same tests.
-record _≃〈_〉_ {A : Set} (x : A) (T : Testable A) (y : A) : Set₁ where
+record _≃⟨_⟩_ {A : Set} (x : A) (T : Testable A) (y : A) : Set₁ where
   field
     eqProof : (φ : Test T) → (x ⊨ φ ≡ y ⊨ φ)
 
-open _≃〈_〉_ public
+open _≃⟨_⟩_ public
 
 ≡→≃ : {A : Set} → {T : Testable A} →
-      {a b : A} → a ≡ b → a ≃〈 T 〉 b
+      {a b : A} → a ≡ b → a ≃⟨ T ⟩ b
 ≡→≃ p = record { eqProof = λ φ → cong (λ x → x ⊨ φ) p  }
 
 ≃-refl :  {A : Set} → (T : Testable A) →
-          {a : A} → a ≃〈 T 〉 a
+          {a : A} → a ≃⟨ T ⟩ a
 ≃-refl T = record { eqProof = λ φ → refl }
 
 ≃-sym :  {A : Set} → (T : Testable A) →
-         {a b : A} → a ≃〈 T 〉 b → b ≃〈 T 〉 a
+         {a b : A} → a ≃⟨ T ⟩ b → b ≃⟨ T ⟩ a
 ≃-sym T p = record { eqProof = sym ∘ (eqProof p)  }
 
 ≃-trans :  {A : Set} → (T : Testable A) →
-           {a b c : A} → a ≃〈 T 〉 b → b ≃〈 T 〉 c → a ≃〈 T 〉 c
+           {a b c : A} → a ≃⟨ T ⟩ b → b ≃⟨ T ⟩ c → a ≃⟨ T ⟩ c
 ≃-trans T p₁ p₂ =
   record { eqProof = λ φ → trans (eqProof p₁ φ) (eqProof p₂ φ) }
 
 ≃-setoid : {A : Set} → (T : Testable A) → Setoid _ _
 ≃-setoid {A} T = record
   { Carrier = A
-  ;_≈_ = λ x y → x ≃〈 T 〉 y
+  ;_≈_ = λ x y → x ≃⟨ T ⟩ y
   ; isEquivalence = record
     { refl = ≃-refl T
     ; sym = ≃-sym T
@@ -114,7 +114,7 @@ open _≃〈_〉_ public
 -- Most likely impossible to prove within Agda.
 -- Is it consistent with the system to postulate this for _IsoTestable_ ?
 -- ≃-cong :  {A B : Set} → {T₁ : Testable A} → {T₂ : Testable B} → {a b : A} →
---           (f : A → B) → a ≃〈 T₁ 〉 b → f a ≃〈 T₂ 〉 f b
+--           (f : A → B) → a ≃⟨ T₁ ⟩ b → f a ≃⟨ T₂ ⟩ f b
 
 -- If A is testable and there is a map B → A, then B is also testable.
 comap-testable : {A B : Set} → (B → A) → Testable A → Testable B
@@ -136,8 +136,8 @@ iso-testable {A} {B} I T =
   }
 
 -- | Heterogeneous
-record _~〈_∥_〉_ {A B : Set} (x : A) (T : Testable A) (I : Iso B A) (y : B) : Set₁ where
+record _~⟨_∥_⟩_ {A B : Set} (x : A) (T : Testable A) (I : Iso B A) (y : B) : Set₁ where
   field
     eqProofH : (φ : Test T) → (x ⊨ φ ≡ (Iso.iso I y) ⊨ φ)
 
-open _~〈_∥_〉_ public
+open _~⟨_∥_⟩_ public
