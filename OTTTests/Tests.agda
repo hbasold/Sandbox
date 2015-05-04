@@ -53,18 +53,11 @@ open IsoTestable public
 
 SubTests : {A : Set} → Testable A → Kind → Set
 
-record NonTrivTest {A : Set} (T : Testable A) : Set where
-  inductive
-  constructor nonTrivTest
-  field
-    subT : SubTests T (kind T)
-open NonTrivTest public
-
 -- | Test formulae
 data Test {A : Set} (T : Testable A) : Set where
   ⊤ : Test T
   ⊥ : Test T
-  nonTriv : NonTrivTest T → Test T
+  nonTriv : SubTests T (kind T) → Test T
 
 SubTests T ind   = Π (index T) (λ i → Test (partsTestable T i))
 SubTests T coind = Σ (index T) (λ i → Test (partsTestable T i))
@@ -78,7 +71,7 @@ sat : {A : Set} {T : Testable A} →
 _⊨_ : {A : Set} {T : Testable A} → A → Test T → Bool
 x ⊨ ⊤ = true
 x ⊨ ⊥ = false
-_⊨_ {A} {T} x (nonTriv nt) = sat (kind T) (subT nt) (obs T x)
+_⊨_ {A} {T} x (nonTriv nt) = sat (kind T) nt (obs T x)
 
 sat ind   φs      o = cotuple (λ i y → y ⊨ app φs i) o
 sat coind (i , φ) o = app o i ⊨ φ

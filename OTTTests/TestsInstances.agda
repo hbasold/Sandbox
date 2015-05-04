@@ -46,7 +46,7 @@ ext {A} {B} TB f g p = record { eqProof = q }
     q : (φ : Test (FunTestable TB)) → f ⊨ φ ≡ g ⊨ φ
     q ⊤ = refl
     q ⊥ = refl
-    q (nonTriv (nonTrivTest (i , ψ))) = eqProof (p i) ψ
+    q (nonTriv (i , ψ)) = eqProof (p i) ψ
 
 -- | Make unit type testable
 ⊤-testable : Testable One
@@ -138,7 +138,7 @@ lem-≃→≡-ℕ-zero {n} p = q
         false → ⊥ } }
 
     φ : Test ℕ-testable
-    φ = nonTriv (nonTrivTest ψs)
+    φ = nonTriv ψs
 
     -- n fulfils test, ...
     u : n ⊨ φ ≡ true
