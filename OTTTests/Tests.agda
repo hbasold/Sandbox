@@ -13,7 +13,7 @@
 
   Using such an instance of Testable for A, we can define _tests_ and
   _observational equivalence_ for A. Moreover, we give a bisimulation proof
-  method and prove its soundness and completeness.
+  method and prove its soundness.
 -}
 module Tests where
 
@@ -201,6 +201,7 @@ open CoindProof public
 ≈-Proof ind   = IndProof
 ≈-Proof coind = CoindProof
 
+-- | Lemma for induction to prove soundness of bisimilarity
 lem-≈→≃-testInduct : {j : Size} {A : Set} → (T : Testable A) → (x y : A) →
                      x ≈⟨ T ⟩ y → (φ : Test {j} T) → x ⊨ φ ≡ y ⊨ φ
 lem-≈→≃-testInduct _ _ _ _ ⊤ = refl
@@ -238,6 +239,14 @@ lem-≈→≃-testInduct {j} {A} T x y x≈y (nonTriv {l} nt)
       x ≈⟨ T ⟩ y → x ≃⟨ T ⟩ y
 ≈→≃ T x y x≈y = record { eqProof = lem-≈→≃-testInduct T x y x≈y }
 
+{-
 ≃→≈ : {A : Set} → (T : Testable A) → (x y : A) →
       x ≃⟨ T ⟩ y → x ≈⟨ T ⟩ y
-≃→≈ = {!!}
+≃→≈ {A} T x y x≃y = record { proof = matchKind (kind T) (obs T) }
+  where
+    matchKind : (k : Kind) →
+                (o : A → ObsTy (index T) (parts T) k) →
+                ≈-Proof k T o x y
+    matchKind ind o = {!!}
+    matchKind coind o = {!!}
+-}
