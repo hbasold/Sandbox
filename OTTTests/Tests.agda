@@ -160,23 +160,27 @@ record _~⟨_∥_⟩_ {A B : Set} (x : A) (T : Testable A) (I : Iso B A) (y : B)
 
 open _~⟨_∥_⟩_ public
 
+-- | Helper to match on Kind in construction of ≈.
 ≈-Proof : {A : Set} →
           (k : Kind) →
           (T : Testable A) →
           (A → ObsTy (index T) (parts T) k) →
           A → A → Set
 
+-- | Bisimilarity induced from testable types.
 record _≈⟨_⟩_ {A : Set} (x : A) (T : Testable A) (y : A) : Set where
   coinductive
   field
     proof : ≈-Proof (kind T) T (obs T) x y
 open _≈⟨_⟩_ public
 
+-- | Helper to fiddle around with index in construction of IndProof.
 ResolveIdx : {A : Set} → (T : Testable A) →
              (i : index T) → (r s : ObsTy (index T) (parts T) ind) →
              proj₁ r ≡ i → proj₁ s ≡ i → Set
 ResolveIdx T i (.i , x') (.i , y') refl refl = x' ≈⟨ partsTestable T i ⟩ y'
 
+-- | Proofs of bisimilarity on inductive types.
 record IndProof {A : Set}
   (T : Testable A)
   (o : A → ObsTy (index T) (parts T) ind)
@@ -189,6 +193,7 @@ record IndProof {A : Set}
     eqTrans : ResolveIdx T which (o x) (o y) eqIndex₁ eqIndex₂
 open IndProof public
 
+-- | Proofs of bisimilarity on coinductive types.
 record CoindProof {A : Set}
   (T : Testable A)
   (o : A → ObsTy (index T) (parts T) coind)
