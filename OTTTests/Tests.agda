@@ -69,21 +69,21 @@ record IsoTestable (A : Set) : Set₁ where
     obsIso : IsIso (obs testable)
 open IsoTestable public
 
-SubTests : Size → {A : Set} → Testable A → Kind → Set
+SubTests : {l : Size} → {A : Set} → Testable A → Kind → Set
 
 -- | Test formulae
 data Test {i : Size} {A : Set} (T : Testable A) : Set where
   ⊤ : Test T
   ⊥ : Test T
-  nonTriv : {j : Size< i} → SubTests j T (kind T) → Test {i} {A} T
+  nonTriv : {j : Size< i} → SubTests {j} T (kind T) → Test {i} {A} T
 
-SubTests l T ind   = Π (index T) (λ i → Test {l} (partsTestable T i))
-SubTests l T coind = Σ (index T) (λ i → Test {l} (partsTestable T i))
+SubTests {l} T ind   = Π (index T) (λ i → Test {l} (partsTestable T i))
+SubTests {l} T coind = Σ (index T) (λ i → Test {l} (partsTestable T i))
 
 
 -- | Satisfaction of subtests.
 sat : {A : Set} {T : Testable A} {l : Size} →
-      (k : Kind) → SubTests l T k → ObsTy (index T) (parts T) k → Bool
+      (k : Kind) → SubTests {l} T k → ObsTy (index T) (parts T) k → Bool
 
 -- | Test satisfaction
 _⊨_ : {A : Set} {T : Testable A} → A → Test T → Bool
@@ -154,7 +154,8 @@ iso-testable {A} {B} I T =
   }
 
 -- | Heterogeneous
-record _~⟨_∥_⟩_ {A B : Set} (x : A) (T : Testable A) (I : Iso B A) (y : B) : Set₁ where
+record _~⟨_∥_⟩_ {A B : Set}
+                (x : A) (T : Testable A) (I : Iso B A) (y : B) : Set₁ where
   field
     eqProofH : (φ : Test T) → (x ⊨ φ ≡ (Iso.iso I y) ⊨ φ)
 
@@ -216,7 +217,7 @@ lem-≈→≃-testInduct {j} {A} T x y x≈y (nonTriv {l} nt)
   where
 
     matchKind : (k : Kind) →
-           (nt : SubTests l T k) →
+           (nt : SubTests {l} T k) →
            (o : A → ObsTy (index T) (parts T) k) →
            ≈-Proof k T o x y →
            sat k nt (o x) ≡ sat k nt (o y)
