@@ -1,4 +1,22 @@
 {-# OPTIONS --copatterns --sized-types #-}
+
+{- | The purpose of this module is to demonstrate how observational type theory
+  can be implemented for arbitrary types in Agda through the use of tests
+  and a corresponding bisimulation proof method.
+
+  To use the equivalence for a type A, the type has to be made _testable_ by
+  creating an instance of Testable for it, see the accompanying module
+  TestsInstances. Such an instance effectively encodes A as inductive or
+  coinductive type, by giving an observation map to a coproduct of product
+  of components of A. For now, we do not pose any restrictions on this encoding,
+  hence it can be used to induce trivial equivalences.
+
+  Using such an instance of Testable for A, we can define _tests_ and
+  _observational equivalence_ for A. Moreover, we give a bisimulation proof
+  method and prove its soundness and completeness.
+-}
+module Tests where
+
 open import Size
 open import Level
 open import Data.Product
