@@ -40,7 +40,7 @@ FunIsoTestable T =
 -- | We get extensionality for functions under observational equivalence.
 ext : {A B : Set} → (T : Testable B) →
       (f : A → B) → (g : A → B) →
-      ((a : A) →  f a ≃〈 T 〉 g a) →  f ≃〈 FunTestable T 〉 g
+      ((a : A) →  f a ≃⟨ T ⟩ g a) →  f ≃⟨ FunTestable T ⟩ g
 ext {A} {B} TB f g p = record { eqProof = q }
   where
     q : (φ : Test (FunTestable TB)) → f ⊨ φ ≡ g ⊨ φ
@@ -69,7 +69,7 @@ partsTestable ⊤-testable = λ i → ⊤-testable
 
 -- | Obs. equiv. is a congruence on ⊤.
 ≃-cong-⊤ : {A : Set} → {T : Testable A} → {x y : One} →
-           (f : One → A) → x ≃〈 ⊤-testable 〉 y → f x ≃〈 T 〉 f y
+           (f : One → A) → x ≃⟨ ⊤-testable ⟩ y → f x ≃⟨ T ⟩ f y
 ≃-cong-⊤ f p = record { eqProof = λ φ → refl }
 
 Parts-ℕ : Bool → Set
@@ -125,7 +125,7 @@ lem-tt≢ff false () _
 
 -- | If a number is observationally equivalent to 0, then it is
 -- actually 0.
-lem-≃→≡-ℕ-zero : {n : ℕ} → n ≃〈 ℕ-testable 〉 zero → n ≡ zero
+lem-≃→≡-ℕ-zero : {n : ℕ} → n ≃⟨ ℕ-testable ⟩ zero → n ≡ zero
 lem-≃→≡-ℕ-zero {n} p = q
   where
     -- Test to distinguish zero
@@ -167,12 +167,12 @@ lem-≃→≡-ℕ-zero {n} p = q
 
 -- | If a number is observationally equivalent to a successor, then it is
 -- actually a succesor.
-lem-≃→≡-ℕ-suc : (n m : ℕ) → n ≃〈 ℕ-testable 〉 suc m →
-       ∃ λ n' → (n ≡ suc n') × (n' ≃〈 ℕ-testable 〉 m)
+lem-≃→≡-ℕ-suc : (n m : ℕ) → n ≃⟨ ℕ-testable ⟩ suc m →
+       ∃ λ n' → (n ≡ suc n') × (n' ≃⟨ ℕ-testable ⟩ m)
 lem-≃→≡-ℕ-suc = {!!}
 
 -- | Observational equivalence for natural numbers implies equivalence.
-≃→≡-ℕ : {n m : ℕ} → n ≃〈 ℕ-testable 〉 m → n ≡ m
+≃→≡-ℕ : {n m : ℕ} → n ≃⟨ ℕ-testable ⟩ m → n ≡ m
 ≃→≡-ℕ {n} {zero} p = lem-≃→≡-ℕ-zero p
 ≃→≡-ℕ {n} {(suc m)} p with lem-≃→≡-ℕ-suc n m p
 ... | n' , q , p' =
@@ -186,7 +186,7 @@ lem-≃→≡-ℕ-suc = {!!}
 
 -- | Obs. equiv. is a congruence for natural numbers.
 ≃-cong-ℕ : {A : Set} → {T : Testable A} → {x y : ℕ} →
-           (f : ℕ → A) → x ≃〈 ℕ-testable 〉 y → f x ≃〈 T 〉 f y
+           (f : ℕ → A) → x ≃⟨ ℕ-testable ⟩ y → f x ≃⟨ T ⟩ f y
 ≃-cong-ℕ {A} {T} {x} {y} f p = record { eqProof = q }
   where
     q : (φ : Test T) → f x ⊨ φ ≡ f y ⊨ φ
