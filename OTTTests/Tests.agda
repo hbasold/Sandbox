@@ -1,5 +1,5 @@
-{-# OPTIONS --copatterns  #-}
-
+{-# OPTIONS --copatterns --sized-types #-}
+open import Size
 open import Level
 open import Data.Product
 open import Data.Bool
@@ -51,16 +51,16 @@ record IsoTestable (A : Set) : Set₁ where
     obsIso : IsIso (obs testable)
 open IsoTestable public
 
-SubTests : {A : Set} → Testable A → Kind → Set
+SubTests : {i : Size} → {A : Set} → Testable A → Kind → Set
 
 -- | Test formulae
-data Test {A : Set} (T : Testable A) : Set where
+data Test {i : Size} {A : Set} (T : Testable A) : Set where
   ⊤ : Test T
   ⊥ : Test T
-  nonTriv : SubTests T (kind T) → Test T
+  nonTriv : {j : Size< i} → SubTests {j} T (kind T) → Test {i} {A} T
 
-SubTests T ind   = Π (index T) (λ i → Test (partsTestable T i))
-SubTests T coind = Σ (index T) (λ i → Test (partsTestable T i))
+SubTests {k} T ind   = Π (index T) (λ i → Test {k} (partsTestable T i))
+SubTests {k} T coind = Σ (index T) (λ i → Test {k} (partsTestable T i))
 
 
 -- | Satisfaction of subtests.
