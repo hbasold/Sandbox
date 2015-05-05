@@ -141,3 +141,85 @@ record _~⟨_∥_⟩_ {A B : Set} (x : A) (T : Testable A) (I : Iso B A) (y : B)
     eqProofH : (φ : Test T) → (x ⊨ φ ≡ (Iso.iso I y) ⊨ φ)
 
 open _~⟨_∥_⟩_ public
+
+≈-Proof : {A : Set} →
+          (k : Kind) →
+          (T : Testable A) →
+          (A → ObsTy (index T) (parts T) k) →
+          A → A → Set
+
+record _≈⟨_⟩_ {A : Set} (x : A) (T : Testable A) (y : A) : Set where
+  coinductive
+  field
+    proof : ≈-Proof (kind T) T (obs T) x y
+open _≈⟨_⟩_ public
+
+ResolveIdx : {A : Set} → (T : Testable A) →
+             (i : index T) → (r s : ObsTy (index T) (parts T) ind) →
+             proj₁ r ≡ i → proj₁ s ≡ i → Set
+ResolveIdx T i (.i , x') (.i , y') refl refl = x' ≈⟨ partsTestable T i ⟩ y'
+
+record IndProof {A : Set}
+  (T : Testable A)
+  (o : A → ObsTy (index T) (parts T) ind)
+  (x y : A) : Set where
+  coinductive
+  field
+    which : index T
+    eqIndex₁ : proj₁ (o x) ≡ which
+    eqIndex₂ : proj₁ (o y) ≡ which
+    eqTrans : ResolveIdx T which (o x) (o y) eqIndex₁ eqIndex₂
+open IndProof public
+
+record CoindProof {A : Set}
+  (T : Testable A)
+  (o : A → ObsTy (index T) (parts T) coind)
+  (x y : A) : Set where
+  coinductive
+  field
+    eqStep : (i : index T) → app (o x) i ≈⟨ partsTestable T i ⟩ app (o y) i
+open CoindProof public
+
+≈-Proof ind   = IndProof
+≈-Proof coind = CoindProof
+
+lem-≈→≃-testInduct : {j : Size} {A : Set} → (T : Testable A) → (x y : A) →
+                     x ≈⟨ T ⟩ y → (φ : Test {j} T) → x ⊨ φ ≡ y ⊨ φ
+lem-≈→≃-testInduct _ _ _ _ ⊤ = refl
+lem-≈→≃-testInduct _ _ _ _ ⊥ = refl
+lem-≈→≃-testInduct {j} {A} T x y x≈y (nonTriv {l} nt)
+  = matchKind (kind T) nt (obs T) (proof x≈y)
+  where
+
+    matchKind : (k : Kind) →
+           (nt : SubTests {l} T k) →
+           (o : A → ObsTy (index T) (parts T) k) →
+           ≈-Proof k T o x y →
+           sat k nt (o x) ≡ sat k nt (o y)
+    matchKind ind   nt o p
+      = refine (which p) (o x) (o y) (eqIndex₁ p) (eqIndex₂ p) (eqTrans p)
+      where
+        --| Do pattern matching on IndProof
+        refine :  (i : index T) → (r s : ObsTy (index T) (parts T) ind) →
+                  (eqP₁ : proj₁ r ≡ i) → (eqP₂ : proj₁ s ≡ i) →
+                  ResolveIdx T i r s eqP₁ eqP₂ →
+                  (proj₂ r) ⊨ app nt (proj₁ r) ≡ (proj₂ s) ⊨ app nt (proj₁ s)
+        refine i (.i , x') (.i , y') refl refl p'
+          = lem-≈→≃-testInduct (partsTestable T i) x' y' p' (app nt i)
+    matchKind coind nt o p
+      = lem-≈→≃-testInduct (partsTestable T i) x' y' (eqStep p i) ψ
+      where
+        i : index T
+        i = proj₁ nt
+        ψ = proj₂ nt
+        x' = app (o x) i
+        y' = app (o y) i
+
+-- | Bisimulation proofs are sound for observational equivalence.
+≈→≃ : {A : Set} → (T : Testable A) → (x y : A) →
+      x ≈⟨ T ⟩ y → x ≃⟨ T ⟩ y
+≈→≃ T x y x≈y = record { eqProof = lem-≈→≃-testInduct T x y x≈y }
+
+≃→≈ : {A : Set} → (T : Testable A) → (x y : A) →
+      x ≃⟨ T ⟩ y → x ≈⟨ T ⟩ y
+≃→≈ = {!!}
