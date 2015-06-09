@@ -106,14 +106,9 @@ module _ where
 
   module PElim {A} {S : P A → Set}
     (now* : ∀(a : A) → S (now a))
-    (later* : (x : ∞P A) -- → (y : P A) → (p : force x == y) →
-              (x_rec : D (S (force x))) → S (later x))
-    (weak~* : (x : ∞P A) -- → (y : P A) → (p : force x == y) →
-              (x_rec : D (S (force x))) →
+    (later* : (x : ∞P A) → (x_rec : D (S (force x))) → S (later x))
+    (weak~* : (x : ∞P A) → (x_rec : D (S (force x))) →
               (later* x x_rec == (#force x_rec) [ S ↓ (weak~ x) ]))
---               (y_rec : S y) →
---              (#force x_rec == y_rec) →
---              (later* x y p x_rec == y_rec [ S ↓ (weak~ x) ]))
     where
       g-aux : Phantom weak~* → (y : ∞P A) → D (S (#force y))
 
@@ -132,7 +127,7 @@ module _ where
 
       postulate      -- HIT
         weak~-β : (x : ∞P A) → (y : P A) → (p : force x == y) →
-                  apd f (weak~ x) == weak~* x (g x) -- idp
+                  apd f (weak~ x) == weak~* x (g x)
 
 open PRec public using () renaming (f to P-rec)
 --open SizedPRec public using () renaming (f to P-sized-rec)
@@ -171,8 +166,7 @@ bind {A} {B} f = P-rec f later weak~
     T : P (P A) → Set
     T x = μ ( P₁ (P₁ f) x) == P₁ f (μ x)
 
-    p : (x : ∞P (P A)) → -- (y : P (P A)) → force x == y →
-        D (T (force x)) → T (later x)
+    p : (x : ∞P (P A)) → D (T (force x)) → T (later x)
     p x dty =
         μ (P₁ (P₁ f) (later x))
       =⟨ idp ⟩
@@ -186,15 +180,8 @@ bind {A} {B} f = P-rec f later weak~
       =⟨ idp ⟩
          P₁ f (μ (later x))
       ∎
-      where
-      {-
-        lem : D (T (#force x))
-        lem = J' (λ z _ → D (T z)) dty fx=y
-      -}
-    r : (x : ∞P (P A)) -- (y : P (P A)) (p₁ : force x == y)
-        (x_rec : D (T (force x))) →
---         (y_rec : μ (P₁ (P₁ f) y) == P₁ f (μ y)) →
---        #force x_rec == y_rec →
+
+    r : (x : ∞P (P A)) → (x_rec : D (T (force x))) →
         (p x x_rec) == (#force x_rec) [ T ↓ (weak~ x) ]
     r = {!!}
 
