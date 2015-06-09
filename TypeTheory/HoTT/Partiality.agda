@@ -59,6 +59,9 @@ module _ where
   postulate  -- HIT
     weak~ : ∀{A} → (x : ∞P A) → (later x == force x)
 
+  -- | Extra module for recursion using sized types.
+  -- This is convenient, as we can use the functor D in the definition, which
+  -- in turn simplifies proofs.
   module PRec {A} {X : Set}
     (now* : A → X)
     (later* : D X → X)
@@ -69,40 +72,6 @@ module _ where
         f-aux : ∀ {i} → Phantom weak~* → #P {i} A → X
         f-aux phantom (#p (#now a) _)        = now* a
         f-aux phantom (#p (#later {j} x') _) = later* (D₁ (f {j}) x')
-{-
-  module SizedPRec {A} {X : ∀{i} → Set}
-    (now* : ∀ {i} → A → X {↑ i})
-    (later* : ∀ {i} → D (X {i}) → X {↑ i})
-    (weak~* : (x : D X) → (y : X) → (#force x == y) → (later* x == y))
-    where
-      f : ∀ {i} → P {i} A → X {i}
-      f = f-aux phantom where
-        f-aux : ∀ {i} → Phantom weak~* → #P {i} A → X {i}
-        f-aux phantom (#p (#now {i} a) _)
-          = now* {i} a
-        f-aux phantom (#p (#later {j} x') _)
-          = later* {j} (D₁ (f {j}) x')
-
-  -- Since we cannot up-cast inductive, sized types from P {i} A to
-  -- P {∞} A, the predicate needs to be able to deal with any size
-  -- unfortunately.
-  module PElim {A} {S : ∀{i} → P {i} A → Set}
-    (now* : ∀{i} → (a : A) → S (now {i} a))
-    (later* : ∀{i} → (x : ∞P {i} A) → (y : P {i} A) → (p : force x == y) →
-              (x_rec : D (S y)) → S (later {i} x))
-    (weak~* : (x : ∞P A) → (y : P A) → (p : force x == y) →
-              (x_rec : D (S y)) →
-              (y_rec : S y) →
-              (#force x_rec == y_rec) →
-              (later* x y p x_rec == y_rec [ S ↓ (weak~ x y p) ]))
-    where
-      f : ∀ {i} → (x : P {i} A) → S x
-      f = f-aux phantom where
-        f-aux : Phantom weak~* → ∀ {i} → (x : P {i} A) → S x
-        f-aux phantom (#p (#now a) _)    = now* a
-        f-aux phantom (#p (#later {j} x') _)
-          = later* x' (force x') idp (↑D₁ S (f {j}) x')
--}
 
   module PElim {A} {S : P A → Set}
     (now* : ∀(a : A) → S (now a))
@@ -130,7 +99,6 @@ module _ where
                   apd f (weak~ x) == weak~* x (g x)
 
 open PRec public using () renaming (f to P-rec)
---open SizedPRec public using () renaming (f to P-sized-rec)
 open PElim public using () renaming (f to P-elim)
 
 module Bla where
