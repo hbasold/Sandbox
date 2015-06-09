@@ -92,14 +92,35 @@ module _ where
       g = g-aux phantom
 
       f : (x : P A) → S x
-      f = f-aux phantom where
+      f = f-aux phantom
+
+      f-homomorphism : (y : ∞P A) → f (later y) == later* y (↑D₁ S f y)
+      f-homomorphism y =
+          f (later y)
+        =⟨ idp ⟩
+          later* y (g y)
+        =⟨ g-is-D₁f |in-ctx later* y ⟩
+          later* y (↑D₁ S f y)
+        ∎
+        where
+          lem : #force (g y) == #force (↑D₁ S f y)
+          lem =
+              #force (g y)
+            =⟨ idp ⟩
+              f (#force y)
+            =⟨ idp ⟩
+              #force (↑D₁ S f y)
+            ∎
+
+          g-is-D₁f : g y == ↑D₁ S f y
+          g-is-D₁f = D-coind lem
 
       postulate      -- HIT
-        weak~-β : (x : ∞P A) → (y : P A) → (p : force x == y) →
-                  apd f (weak~ x) == weak~* x (g x)
+        weak~-β : (x : ∞P A) → apd f (weak~ x) == weak~* x (g x)
 
 open PRec public using () renaming (f to P-rec)
-open PElim public using () renaming (f to P-elim)
+open PElim public using ()
+  renaming (f to P-elim; g to ∞P-elim; f-homomorphism to P-elim-hom)
 
 module Bla where
 
@@ -151,7 +172,7 @@ bind {A} {B} f = P-rec f later weak~
 
     r : (x : ∞P (P A)) → (x_rec : D (T (force x))) →
         (p x x_rec) == (#force x_rec) [ T ↓ (weak~ x) ]
-    r = {!!}
+    r x x_rec = {!!}
 
     q : (x : P (P A)) → μ ( P₁ (P₁ f) x) == P₁ f (μ x)
     q = P-elim
