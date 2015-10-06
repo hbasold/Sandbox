@@ -13,6 +13,9 @@ open import Function
 open import Relation.Binary.PropositionalEquality
 open import Relation.Nullary
 
+• : Set
+• = ⊤
+
 -- | Container for defining signatures
 record Cont : Set₁ where
   constructor cont
@@ -29,7 +32,7 @@ open Cont
 record T∞ (C : Cont) : Set where
   coinductive
   field
-    out : ⊤ ⊎ ⟪ C ⟫ (T∞ C)
+    out : • ⊎ ⟪ C ⟫ (T∞ C)
 open T∞
 
 ------
@@ -98,11 +101,18 @@ F : (T∞ sig₁ → Set) → T∞ sig₁ → Set
 F G x = m (out x)
   where
     m : ⊤ ⊎ ⟪ sig₁ ⟫ (T∞ sig₁) → Set
-    m (inj₁ tt) = ⊥
-    m (inj₂ (inj₁ tt , _)) = ⊤
-    m (inj₂ (inj₂ tt , α)) =
+    m (inj₁ tt) = ⊥            -- case for •
+    m (inj₂ (inj₁ tt , _)) = ⊤ -- case for c, k₀
+    m (inj₂ (inj₂ tt , α)) =   -- case for f x, k₁
       let x = α zero
       in G x × G (f (f x))
+
+record P-coind' (x : T∞ sig₁) : Set where
+  coinductive
+  field
+    p-out' : F P-coind' x
+open P-coind'
+
 
 record P-coind {i : Size} (x : T∞ sig₁) : Set where
   coinductive
@@ -120,6 +130,51 @@ p-coind = (_ , k _ k₀)
   where
     k : ∀{i} → (x : T∞ sig₁) → P-coind {i} x → P-coind {i} (f x)
     p-out (k x q) = (q , k (f x) (k x q))
+
+----------
+
+sig₂ : Cont
+sig₂ = cont (⊤ ⊎ ⊤) ar₂
+  where
+    ar₂ : ⊤ ⊎ ⊤ → Set
+    ar₂ (inj₁ tt) = Fin 1
+    ar₂ (inj₂ tt) = Fin 2
+
+S' cons' : Pos sig₂
+S'    = inj₁ tt
+cons' = inj₂ tt
+
+S : T∞ sig₂ → T∞ sig₂
+out (S x) = inj₂ (S' , (λ _ → x))
+
+cons : T∞ sig₂ → T∞ sig₂ → T∞ sig₂
+out (cons x y) = inj₂ (cons' , α)
+  where
+    α : Sh sig₂ cons' → T∞ sig₂
+    α zero    = x
+    α (suc _) = y
+
+From-Enc : (T∞ sig₂ → T∞ sig₂ → Set) → T∞ sig₂ → T∞ sig₂ → Set
+From-Enc G x y with (out y)
+... | inj₁ x₁ = ⊥ -- •
+... | inj₂ (inj₁ tt , _) = ⊥ -- S
+... | inj₂ (inj₂ tt , α) =   -- cons (x', y)
+  let x' = α zero
+      y  = α (suc zero)
+  in x ≡ x' → G (S x) y
+  where
+
+record From (x y : T∞ sig₂) : Set where
+  coinductive
+  field
+    out-From : Frodm-Enc From x y
+open From
+
+thm : (x : T∞ sig₂) → ∃ λ y → From x y
+thm x = ({!!} , {!!})
+  where
+    q : From x _
+    out-From q = {!!}
 
 ---------------------
 -- Some other tries
