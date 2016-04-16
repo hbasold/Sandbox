@@ -68,11 +68,11 @@ module SDE-Impl (Σ : Sig) (X : Set) where
   -- | Interpretation of symbols defined by the given SDE as streams.
   ⟦_⟧ : ∀ {A} → SDE A → ((f : ∥ Σ ∥) → ar Σ f → X) → (f : ∥ Σ ∥) →
         ∀{i} → (X → Stream {i} A) → Stream {i} A
-  hd (⟦ E ⟧ v f r) = f-out (hd ∘ r ∘ v f)
+  hd (⟦ E ⟧ vars f vals) = f-out (hd ∘ vals ∘ vars f)
     where f-out = proj₁ (E f)
-  tl (⟦ E ⟧ v f r) = ⟦ E ⟧₁ v (f-step (hd ∘ r ∘ v f)) r
+  tl (⟦ E ⟧ vars f vals) = ⟦ E ⟧₁ vars (f-step (hd ∘ vals ∘ vars f)) vals
     where f-step = proj₂ (E f)
 
-  ⟦ E ⟧₁ v (sup (inj₁ (f , α)))  r = ⟦ E ⟧ v f (λ x → tl (r x))
-  ⟦ E ⟧₁ v (sup (inj₂ (inj₁ x))) r = r x
-  ⟦ E ⟧₁ v (sup (inj₂ (inj₂ x))) r = tl (r x)
+  ⟦ E ⟧₁ vars (sup (inj₁ (f , α)))  vals = ⟦ E ⟧ vars f (λ x → tl (vals x))
+  ⟦ E ⟧₁ vars (sup (inj₂ (inj₁ x))) vals = vals x
+  ⟦ E ⟧₁ vars (sup (inj₂ (inj₂ x))) vals = tl (vals x)
