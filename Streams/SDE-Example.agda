@@ -9,8 +9,6 @@ open import Relation.Binary
 open import Relation.Binary.PropositionalEquality as P hiding ([_])
 open ≡-Reasoning
 
-open import Data.Empty
-open import Data.Unit hiding (_≤_)
 open import Data.Product as Prod renaming (Σ to ⨿)
 open import Data.Nat as Nat
 open import Data.Sum as Sum

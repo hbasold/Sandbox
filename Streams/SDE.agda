@@ -3,18 +3,9 @@
 module SDE where
 
 open import Size
-import Level
 open import Function
-open import Relation.Binary
-open import Relation.Binary.PropositionalEquality as P hiding ([_])
-open ≡-Reasoning
-
-open import Data.Empty
-open import Data.Unit hiding (_≤_)
 open import Data.Product as Prod renaming (Σ to ⨿)
-open import Data.Nat as Nat
 open import Data.Sum as Sum
-open import Data.Fin hiding (_+_)
 
 open import Streams
 
@@ -77,13 +68,11 @@ module SDE-Impl (Σ : Sig) (X : Set) where
   -- | Interpretation of symbols defined by the given SDE as streams.
   ⟦_⟧ : ∀ {A} → SDE A → ((f : ∥ Σ ∥) → ar Σ f → X) → (f : ∥ Σ ∥) →
         ∀{i} → (X → Stream {i} A) → Stream {i} A
-  hd (⟦ E ⟧ v f r) =
-    let (f-out , f-step) = E f
-    in f-out (hd ∘ r ∘ v f)
-  tl (⟦ E ⟧ v f r) =
-    let (f-out , f-step) = E f
-    in ⟦ E ⟧₁ v (f-step (hd ∘ r ∘ v f)) r
+  hd (⟦ E ⟧ v f r) = f-out (hd ∘ r ∘ v f)
+    where f-out = proj₁ (E f)
+  tl (⟦ E ⟧ v f r) = ⟦ E ⟧₁ v (f-step (hd ∘ r ∘ v f)) r
+    where f-step = proj₂ (E f)
 
-  ⟦ E ⟧₁ v (sup (inj₁ (f , α))) r  = ⟦ E ⟧ v f (λ x → tl (r x))
+  ⟦ E ⟧₁ v (sup (inj₁ (f , α)))  r = ⟦ E ⟧ v f (λ x → tl (r x))
   ⟦ E ⟧₁ v (sup (inj₂ (inj₁ x))) r = r x
   ⟦ E ⟧₁ v (sup (inj₂ (inj₂ x))) r = tl (r x)
