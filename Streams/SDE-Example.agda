@@ -159,7 +159,7 @@ postulate
 
 -- | The interpretation of the SDE for stream addition has indeed the
 -- same behaviour as the direct implemenentation.
-correct-⊕ : ∀ {s t} → (s ⊕ t) ∼ˢ (s ⊕' t)
+correct-⊕ : ∀ {s t} → (s ⊕ t) ~ (s ⊕' t)
 correct-⊕ = lem
   where
     lem₁ : ∀{x y} (z : X) → tl (put x y z) ≡ put (tl x) (tl y) z
@@ -171,7 +171,7 @@ correct-⊕ = lem
     R : Rel (Stream ℕ) _
     R x y = ∃ (λ s → ∃ (λ t → x ≡ s ⊕ t × y ≡ ⟦ E ⟧ vars p (put s t)))
 
-    is-bisim : is-Bisim R
+    is-bisim : Is-Bisim R
     is-bisim x y (s , t , x=⊕ , y=E) = hd-≡ , tl-R
       where
         hd-≡ : hd x ≡ hd y
@@ -214,12 +214,12 @@ correct-⊕ = lem
                 ⟦ E ⟧ vars p (put (tl s) (tl t))
               ∎
 
-    lem : ∀{s t} → (s ⊕ t) ∼ˢ (⟦ E ⟧ vars p (put s t))
+    lem : ∀{s t} → (s ⊕ t) ~ (⟦ E ⟧ vars p (put s t))
     lem {s} {t} = ex-bisimulation→bisim is-bisim rel
       where
         rel : R (s ⊕ t) (⟦ E ⟧ vars p (put s t))
         rel = (s , t , refl , refl)
 
 -- Conjecture.
-correct-⊗ : ∀ {s t} → (s ⊗ t) ∼ˢ (s ⊗' t)
+correct-⊗ : ∀ {s t} → (s ⊗ t) ~ (s ⊗' t)
 correct-⊗ = {!!}
