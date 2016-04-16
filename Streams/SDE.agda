@@ -49,9 +49,9 @@ module SDE-Impl (Σ : Sig) (X : Set) where
 
   open Terms Σ
 
-  -- | Variables are streams, their derivatives or their output
+  -- | Variables for streams and their derivatives.
   V : Set
-  V = X ⊎ X -- ⊎ X
+  V = X ⊎ X
 
   -- | An SDE consists of an assignment of outputs and terms for
   -- each symbol in the signature. Note that both output and the
@@ -73,6 +73,14 @@ module SDE-Impl (Σ : Sig) (X : Set) where
   tl (⟦ E ⟧ vars f vals) = ⟦ E ⟧₁ vars (f-step (hd ∘ vals ∘ vars f)) vals
     where f-step = proj₂ (E f)
 
+  -- Interpret terms by induction. This map is assumed to be called from the
+  -- tail case of ⟦_⟧.
+
+  -- For a symbol, we just use its interpretation but on the tails of the
+  -- argument streams
   ⟦ E ⟧₁ vars (sup (inj₁ (f , α)))  vals = ⟦ E ⟧ vars f (λ x → tl (vals x))
+  -- A variable is just interpreted by its valuation.
   ⟦ E ⟧₁ vars (sup (inj₂ (inj₁ x))) vals = vals x
+  -- A variable denoting a derivative is interpreted by the derivative of
+  -- the corresponding stream.
   ⟦ E ⟧₁ vars (sup (inj₂ (inj₂ x))) vals = tl (vals x)
