@@ -45,7 +45,7 @@ tl (corec f x) = corec f (proj₂ (f x))
 
 -- | The usual definition of a bisimulation on streams.
 Is-Bisim : ∀{A} → Rel (Stream A) _ → Set
-Is-Bisim R = ∀ x y → R x y → hd x ≡ hd y × R (tl x) (tl y)
+Is-Bisim _R_ = ∀ x y → x R y → hd x ≡ hd y × (tl x) R (tl y)
 
 -- | If R is a bisimulation then all elements related by R are bisimilar.
 ex-bisimulation→bisim : ∀{A R} → Is-Bisim {A} R → ∀ {x y} → R x y → x ~ y
@@ -55,9 +55,9 @@ tl~ (ex-bisimulation→bisim p {x} {y} xRy) =
 
 -- | Generalised bisimulations between arbitrary stream coalgebras.
 Is-Bisim' : ∀{A X Y : Set} → (c : X → A × X) (d : Y → A × Y) → REL X Y _ → Set
-Is-Bisim' c d R = ∀ x y → R x y →
+Is-Bisim' c d _R_ = ∀ x y → x R y →
                   proj₁ (c x) ≡ proj₁ (d y) ×
-                  R (proj₂ (c x)) (proj₂ (d y))
+                  (proj₂ (c x)) R (proj₂ (d y))
 
 ex-bisimulation→bisim' : ∀{A X Y R c d} → Is-Bisim' {A} {X} {Y} c d R →
                          ∀ {x y} → R x y → corec c x ~ corec d y

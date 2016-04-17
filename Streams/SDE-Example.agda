@@ -158,18 +158,26 @@ postulate
 -- | The interpretation of the SDE for stream addition has indeed the
 -- same behaviour as the direct implemenentation.
 correct-⊕ : ∀ {s t} → (s ⊕ t) ~ (s ⊕' t)
-correct-⊕ = lem
+correct-⊕ = ex-bisimulation→bisim is-bisim rel
   where
-    lem₁ : ∀{x y} (z : X) → tl (put x y z) ≡ put (tl x) (tl y) z
-    lem₁ zero = refl
-    lem₁ (suc z) = refl
-
     -- Bisimulation relating s ⊕ t and the interpretation of p with
     -- variable assignment (x ↦ s, y ↦ t).
-    R : Rel (Stream ℕ) _
-    R x y = ∃ (λ s → ∃ (λ t → x ≡ s ⊕ t × y ≡ ⟦ E ⟧ vars p (put s t)))
+    _R_ : Rel (Stream ℕ) _
+    x R y = ∃ λ s →
+            ∃ λ t →
+            x ≡ s ⊕ t ×
+            y ≡ ⟦ E ⟧ vars p (put s t)
 
-    is-bisim : Is-Bisim R
+    -- Recall that we have s ⊕' t = ⟦ E ⟧ vars p (put s t), which allows
+    -- us to prove the following.
+    rel : ∀{s t} → (s ⊕ t) R (s ⊕' t)
+    rel {s} {t} = (s , t , refl , refl)
+
+    lem : ∀{x y} (z : X) → tl (put x y z) ≡ put (tl x) (tl y) z
+    lem zero = refl
+    lem (suc z) = refl
+
+    is-bisim : Is-Bisim _R_
     is-bisim x y (s , t , x=⊕ , y=E) = hd-≡ , tl-R
       where
         hd-≡ : hd x ≡ hd y
@@ -184,7 +192,7 @@ correct-⊕ = lem
             hd y
           ∎
 
-        tl-R : R (tl x) (tl y)
+        tl-R : (tl x) R (tl y)
         tl-R = (tl s , tl t , u' , v)
           where
             u' : tl x ≡ tl s ⊕ tl t
@@ -208,15 +216,9 @@ correct-⊕ = lem
                 ⟦ E ⟧₁ vars (p₁ (sup (inj₂ x')) (sup (inj₂ y'))) (put s t)
               ≡⟨ refl ⟩
                 ⟦ E ⟧ vars p (λ x → tl ((put s t) x))
-              ≡⟨ cong (⟦ E ⟧ vars p) (ext lem₁) ⟩
+              ≡⟨ cong (⟦ E ⟧ vars p) (ext lem) ⟩
                 ⟦ E ⟧ vars p (put (tl s) (tl t))
               ∎
-
-    lem : ∀{s t} → (s ⊕ t) ~ (⟦ E ⟧ vars p (put s t))
-    lem {s} {t} = ex-bisimulation→bisim is-bisim rel
-      where
-        rel : R (s ⊕ t) (⟦ E ⟧ vars p (put s t))
-        rel = (s , t , refl , refl)
 
 -- Conjecture.
 correct-⊗ : ∀ {s t} → (s ⊗ t) ~ (s ⊗' t)
