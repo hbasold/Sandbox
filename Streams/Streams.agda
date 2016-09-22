@@ -64,3 +64,11 @@ ex-bisimulation→bisim' : ∀{A X Y R c d} → Is-Bisim' {A} {X} {Y} c d R →
 hd~ (ex-bisimulation→bisim' p {x} {y} xRy) = proj₁ (p x y xRy)
 tl~ (ex-bisimulation→bisim' p {x} {y} xRy) =
   ex-bisimulation→bisim' p (proj₂ (p x y xRy))
+
+~trans : ∀{A} {r s t : Stream A} → r ~ s → s ~ t → r ~ t
+hd~ (~trans p q) = trans  (hd~ p) (hd~ q)
+tl~ (~trans p q) = ~trans (tl~ p) (tl~ q)
+
+~sym : ∀{A} {s t : Stream A} → s ~ t → t ~ s
+hd~ (~sym p) = sym  (hd~ p)
+tl~ (~sym p) = ~sym (tl~ p)
