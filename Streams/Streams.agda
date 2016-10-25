@@ -43,6 +43,17 @@ corec : ∀ {A X : Set} → (X → A × X) → (∀ {i} → X → Stream {i} A)
 hd (corec f x) = proj₁ (f x)
 tl (corec f x) = corec f (proj₂ (f x))
 
+-- | Direct access to elements
+_<_> : ∀{A} → Stream A → ℕ → A
+s < 0 >     = hd s
+s < suc n > = (tl s) < n >
+
+-- | Correctness of bisimlarity
+~→pw-equal : ∀{A} {s t : Stream A} →
+             s ~ t → ∀ n → s < n > ≡ t < n >
+~→pw-equal p zero    = hd~ p
+~→pw-equal p (suc n) = ~→pw-equal (tl~ p) n
+
 -- | The usual definition of a bisimulation on streams.
 Is-Bisim : ∀{A} → Rel (Stream A) _ → Set
 Is-Bisim _R_ = ∀ x y → x R y → hd x ≡ hd y × (tl x) R (tl y)
@@ -64,3 +75,5 @@ ex-bisimulation→bisim' : ∀{A X Y R c d} → Is-Bisim' {A} {X} {Y} c d R →
 hd~ (ex-bisimulation→bisim' p {x} {y} xRy) = proj₁ (p x y xRy)
 tl~ (ex-bisimulation→bisim' p {x} {y} xRy) =
   ex-bisimulation→bisim' p (proj₂ (p x y xRy))
+
+-- | Corr
