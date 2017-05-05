@@ -236,22 +236,21 @@ _•μ_ : Selμ → Selμ → Selμ
 (drop u') •μ (pres y') = drop (u' •μ (y' .out))
 u         •μ (drop v') = drop (u •μ v')
 
--- •≈comp : ∀ x y → (x • y) ≈ comp (x , y)
--- •≈comp x y = corec-sel-unique comp-coalg comp' comp'-hom (x , y)
---   where
---     comp' : Sel × Sel → Sel
---     comp' (x , y) = x • y
+•≈comp : ∀ x y → (x • y) ≈ comp (x , y)
+•≈comp x y = corec-sel-unique comp-coalg comp' comp'-hom (x , y)
+  where
+    comp' : Sel × Sel → Sel
+    comp' (x , y) = x • y
 
---     comp'-homμ : ∀ u v →
---       Selμ₂ _≈_ (u •μ v)
---                 (Selμ₁ comp' (rec-selμ comp-p comp-d u v))
---     comp'-homμ (pres x') (pres y') = ≈-refl
---     comp'-homμ (pres x') (drop v') = comp'-homμ (pres x') v'
---     comp'-homμ (drop u') (pres y') = comp'-homμ u' (y' .out)
---     comp'-homμ (drop u') (drop v') = comp'-homμ (drop u') v'
+    comp'-homμ : ∀ u v →
+      (u •μ v) ≈μ (Selμ₁ comp' (rec-selμ comp-p comp-d u v))
+    comp'-homμ (pres x') (pres y') = pres≈ ≈-refl
+    comp'-homμ (pres x') (drop v') = drop≈ (comp'-homμ (pres x') v')
+    comp'-homμ (drop u') (pres y') = drop≈ (comp'-homμ u' (y' .out))
+    comp'-homμ (drop u') (drop v') = drop≈ (comp'-homμ (drop u') v')
 
---     comp'-hom : Sel-Hom comp-coalg comp'
---     comp'-hom (x , y) = comp'-homμ (x .out) (y .out)
+    comp'-hom : Sel-Hom comp-coalg comp'
+    comp'-hom (x , y) = comp'-homμ (x .out) (y .out)
 \end{code}
 %</selector-composition>
 
