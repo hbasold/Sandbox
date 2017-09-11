@@ -14,7 +14,8 @@ open import Relation.Nullary
 open import Relation.Binary.PropositionalEquality
 
 open import Relation.Binary
-open DecTotalOrder Nat.decTotalOrder using () renaming (refl to ≤-refl; trans to ≤-trans)
+open DecTotalOrder ≤-decTotalOrder using ()
+  renaming (refl to ≤-refl; trans to ≤-trans)
 
 -- open import Size
 
@@ -72,7 +73,7 @@ foo = later (cong inj₂ refl) (now refl)
 μ-dist : ∀{p : ℕ → 𝔹} {m n : ℕ} → μ' p m ↓ n → ∃ λ k → n ≡ m + k
 μ-dist {p} {m} (now q)        with p m
 μ-dist {p} {m} (now ())        | false
-μ-dist {p} {m} (now refl)      | true = (0 , sym (+-right-identity m))
+μ-dist {p} {m} (now refl)      | true = (0 , sym (+-identityʳ m))
 μ-dist {p} {m} (later q t)    with p m
 μ-dist {p} {m} (later refl t)  | false =
   let (k , e) = μ-dist t
