@@ -81,13 +81,13 @@ foo = later (cong inj₂ refl) (now refl)
 μ-dist {p} {m} (later () t)    | true
 
 empty-interval : ∀ {m k} → m ≤ k → k < m → ⊥
-empty-interval z≤n ()
-empty-interval (s≤s p) (s≤s q) = empty-interval p q
+empty-interval z≤n      ()
+empty-interval (s≤s p)  (s≤s q) = empty-interval p q
 
 suc≤⇒≤ : ∀ m n → suc m ≤ n → m ≤ n
-suc≤⇒≤ m zero ()
-suc≤⇒≤ .0 (suc n) (s≤s z≤n) = z≤n
-suc≤⇒≤ .(suc _) (suc .(suc _)) (s≤s (s≤s p)) = s≤s (suc≤⇒≤ _ _ (s≤s p))
+suc≤⇒≤ m         zero            ()
+suc≤⇒≤ .0        (suc n)         (s≤s z≤n)      = z≤n
+suc≤⇒≤ .(suc _)  (suc .(suc _))  (s≤s (s≤s p))  = s≤s (suc≤⇒≤ _ _ (s≤s p))
 
 -- | The proof proceeds by induction on the termination proof t : μ' p m ↓ n.
 -- In the process, we first distinguishing whether m = k or m < k.
@@ -110,9 +110,9 @@ suc≤⇒≤ .(suc _) (suc .(suc _)) (s≤s (s≤s p)) = s≤s (suc≤⇒≤ _ _
 
 -- m < k
 ---- t = now
-μ-min {p} {m}        (now q)    .(suc _) (≤′-step l) u    with p m
-μ-min {p} {m}        (now ())   .(suc _) (≤′-step l) u       | false
-μ-min {p} {.(suc _)} (now refl) .(suc _) (≤′-step l) (s≤s u) | true =
+μ-min {p} {m}        (now q)     .(suc _) (≤′-step l) u    with p m
+μ-min {p} {m}        (now ())    .(suc _) (≤′-step l) u       | false
+μ-min {p} {.(suc _)} (now refl)  .(suc _) (≤′-step l) (s≤s u) | true =
   ⊥-elim (empty-interval (suc≤⇒≤ _ _ (≤′⇒≤ l)) u)
 
 -- m < k
