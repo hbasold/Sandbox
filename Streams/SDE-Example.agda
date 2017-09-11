@@ -30,6 +30,9 @@ _⊗_ : ∀{i} → Stream {i} ℕ → Stream {i} ℕ → Stream {i} ℕ
 hd (x ⊗ y)           = hd x * hd y
 tl (_⊗_ {i} x y) {j} = (tl x ⊗ y) ⊕ ([ hd x ] ⊗ (tl y))
 
+_•_ : ∀{i} → Stream {i} ℕ → Stream {i} ℕ → Stream {i} ℕ
+hd (x • y) = hd x
+tl (x • y) = tl y ⊗ (tl x • y)
 
 --------- Example for syntactic SDE.
 -- We define symbols iₙ (n ∈ ℕ), p and c through SDEs for streams

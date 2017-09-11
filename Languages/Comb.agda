@@ -69,7 +69,7 @@ _⊕_ : ∀{i} → Str {i} K → Str {i} K → Str {i} K
 _⊕_ = pw₂ _+_
 
 ⊝_ : ∀{i} → Str {i} K → Str {i} K
-⊝_ = pw₁ -_
+⊝_ = pw₁ (-_)
 
 _×_ : ∀ {i} → Str {i} K → Str {i} K → Str {i} K
 hd (σ × τ) = hd σ ⋆ hd τ

@@ -1,5 +1,7 @@
 {-# OPTIONS --copatterns --sized-types #-}
 
+module Streams where
+
 open import Level as Level using (zero)
 open import Size
 open import Function
@@ -10,8 +12,6 @@ open ≡-Reasoning
 open import Data.List using (List; module List; []; _∷_; _++_; length)
 open import Data.Nat using (ℕ; zero; suc)
 open import Data.Product renaming (map to pmap)
-
-open import Relations
 
 -- Sized streams via head/tail.
 
@@ -28,11 +28,6 @@ Str = Stream
 
 tl' : ∀ {A} → Str A → Str A
 tl' s = tl s {∞}
-
--- Constructor
-scons : ∀{A} → A → Str A → Str A
-hd (scons a s) = a
-tl (scons a s) = s
 
 -- | Corecursion
 corec : ∀ {X A : Set} → (X → A) → (X → X) → (X → Str A)
@@ -131,6 +126,9 @@ module Bisim (S : Setoid Level.zero Level.zero) where
   StrRel : Set₁
   StrRel = Rel (Str A) Level.zero
 
+  RelTrans : Set₁
+  RelTrans = Rel (Str A) Level.zero → Rel (Str A) Level.zero
+
   -- | Relation transformer that characterises bisimulations
   Φ : Rel (Str A) Level.zero → Rel (Str A) Level.zero
   Φ R s t = (hd s ≈ hd t) × R (tl s) (tl t)
@@ -141,25 +139,28 @@ module Bisim (S : Setoid Level.zero Level.zero) where
   isBisim'→isBisim : ∀ {R} → isBisim' R → isBisim R
   isBisim'→isBisim p s t q = p q
 
-  Φ-compat : RelTrans (Str A) → Set₁
+  Monotone : RelTrans → Set₁
+  Monotone F = ∀ {R S} → R ⇒ S → F R ⇒ F S
+
+  Φ-compat : RelTrans → Set₁
   Φ-compat F = Monotone F × (∀ {R} → F (Φ R) ⇒ Φ (F R))
 
-  isBisim-upto : RelTrans (Str A) → Rel (Str A) Level.zero → Set
+  isBisim-upto : RelTrans → Rel (Str A) Level.zero → Set
   isBisim-upto F R = R ⇒ Φ (F R)
 
-  Φ-compat-pres-upto : {F : RelTrans (Str A)} (P : Φ-compat F) {R : StrRel} →
+  Φ-compat-pres-upto : {F : RelTrans} (P : Φ-compat F) {R : StrRel} →
                        isBisim-upto F R → isBisim-upto F (F R)
   Φ-compat-pres-upto (M , P) p = P ∘ (M p)
 
-  iterTrans : RelTrans (Str A) → ℕ → StrRel → StrRel
+  iterTrans : RelTrans → ℕ → StrRel → StrRel
   iterTrans F zero R = R
   iterTrans F (suc n) R = iterTrans F n (F R)
 
   -- Closure of up-to technique, which will be the the bisimulation we generate from it
-  bisimCls : RelTrans (Str A) → StrRel → StrRel
+  bisimCls : RelTrans → StrRel → StrRel
   bisimCls F R s t = ∃ λ n → iterTrans F n R s t
 
-  clsIsBisim : {F : RelTrans (Str A)} (P : Φ-compat F) {R : StrRel} →
+  clsIsBisim : {F : RelTrans} (P : Φ-compat F) {R : StrRel} →
                isBisim-upto F R → isBisim' (bisimCls F R)
   clsIsBisim P p {s} {t} (zero , sRt) =
     (proj₁ (p sRt) , 1 , proj₂ (p sRt))
@@ -169,26 +170,17 @@ module Bisim (S : Setoid Level.zero Level.zero) where
     in (proj₁ foo , (pmap suc id) (proj₂ foo))
 
   -- Compatible up-to techniques are sound
-  compat-sound : {F : RelTrans (Str A)} (P : Φ-compat F) {R : StrRel} →
+  compat-sound : {F : RelTrans} (P : Φ-compat F) {R : StrRel} →
                  isBisim-upto F R → (s t : Str A) → R s t → s ∼ t
   compat-sound {F} P {R} p s t sRt =
     ∃-bisim→∼ (isBisim'→isBisim {bisimCls F R} (clsIsBisim P p))
     s t (0 , sRt)
 
-  -- | Useful general up-to technique: the equivalence closure is Φ-compatible.
-  equivCls-compat : Φ-compat EquivCls
-  equivCls-compat = equivCls-monotone , compat
-    where
-      compat : {R : StrRel} → EquivCls (Φ R) ⇒ Φ (EquivCls R)
-      compat (cls-incl (h≈ , tR)) = (h≈ , cls-incl tR)
-      compat cls-refl             = (SE.refl , cls-refl)
-      compat {R} (cls-sym p)      =
-        let (h≈ , tR) = compat {R} p
-        in (SE.sym h≈ , cls-sym tR)
-      compat {R} (cls-trans p q) =
-        let (hx≈hy , txRty) = compat {R} p
-            (hy≈hz , tyRtz) = compat {R} q
-        in (SE.trans hx≈hy hy≈hz , cls-trans txRty tyRtz)
+  data EquivCls {B : Set} (R : Rel B Level.zero) : B → B → Set where
+    cls-incl : (a b : B) → R a b → EquivCls R a b
+    cls-refl : (b : B) → EquivCls R b b
+    cls-sym  : (a b : B) → EquivCls R a b → EquivCls R b a
+    cls-trans : (a b c : B) → EquivCls R a b → EquivCls R b c → EquivCls R a c
 
 -- | Element repetition
 repeat : ∀{A} → A → Stream A

@@ -21,9 +21,10 @@ open import Categories.Cocone
 open import Categories.Object.Initial
 open import Categories.Functor.Constant
 
+open import NaturalTransFacts
 open import UpTo
 
-_⇒_ = NaturalTransformation
+-- _⇒_ = NaturalTransformation
 
 EndoDiagram : (C : Cat₀) → (F : EndoFunctor C) → (I : Cat₀) → Set
 EndoDiagram C F I = Functor I (EndoMor (C , F) (C , F))
@@ -65,17 +66,28 @@ EndoMor-inherit-colim {C} F {I} D c =
     module I = Category I
     module CC-D = Category (Cocones D)
 
+    -- Components of F
+    F₀ = Functor.F₀ F
+    F₁ = Functor.F₁ F
+
     -- Components of the diagram D
     D₀ = Functor.F₀ D
     D₁ = Functor.F₁ D
 
-    -- Tᵢ(A) = D(i)(A)
+    -- Tᵢ = π₁(D(i))
     T : (i : I.Obj) → Functor C C
     T i = Endo⇒.T (D₀ i)
 
     -- Components of T
     T₀ = λ i → Functor.F₀ (T i)
     T₁ = λ i {A} {B} → Functor.F₁ (T i) {A} {B}
+
+    -- ρ‌ᵢA = π₂(D(i))
+    ρ : (i : I.Obj) → (T i ∘ F) ⇒ (F ∘ T i)
+    ρ i = Endo⇒.ρ (D₀ i)
+
+    ρη : (i : I.Obj) → (A : C.Obj) → C [ T₀ i (F₀ A) , F₀ (T₀ i A) ]
+    ρη i A = NaturalTransformation.η (ρ i) A
 
     -- The natural transformation (w/o proof) D(f) : D(i) ⇒ D(i)
     D₁η : ∀ {i j} → (f : I [ i , j ]) →
@@ -124,15 +136,11 @@ EndoMor-inherit-colim {C} F {I} D c =
         comm {i} {j} f =
           begin
             C [ κB i ∘ T₁ i u ]
-          ↓⟨ C.∘-resp-≡
-             (Colimit.Ic.commute (c B) f)
-             C.Equiv.refl
-          ⟩
+          ↓⟨ C.∘-resp-≡ˡ (Colimit.Ic.commute (c B) f) ⟩
             (κB j C.∘ DB.F₁ f) C.∘ T₁ i u
           ↓⟨ C.assoc ⟩
             κB j C.∘ (DB.F₁ f C.∘ T₁ i u)
-          ↓⟨ C.∘-resp-≡
-             C.Equiv.refl
+          ↓⟨ C.∘-resp-≡ʳ
              (NaturalTransformation.commute (UpTo⇒.γ (D₁ f)) u)
           ⟩
             κB j C.∘ (T₁ j u C.∘ DA.F₁ f)
@@ -161,10 +169,7 @@ EndoMor-inherit-colim {C} F {I} D c =
           ↓⟨ CoconeMorphism.commute (CA.I.! {cocone-T₁ (C.id {A})}) ⟩
             C [ κ i A ∘ T₁ i (C.id {A}) ]
           -- Functoriality of Tᵢ
-          ↓⟨ C.∘-resp-≡
-             C.Equiv.refl
-             (Functor.identity (T i))
-          ⟩
+          ↓⟨ C.∘-resp-≡ʳ (Functor.identity (T i)) ⟩
             C [ κ i A ∘ C.id {T₀ i A} ]
           ↓⟨ C.identityʳ ⟩
             κ i A
@@ -197,24 +202,19 @@ EndoMor-inherit-colim {C} F {I} D c =
                C [ colim-T₁ g ∘ colim-T₁ f ] C.∘ κ i X
             ↓⟨ C.assoc ⟩
                 colim-T₁ g C.∘ (colim-T₁ f C.∘ κ i X)
-            ↓⟨ C.∘-resp-≡
-               C.Equiv.refl
+            ↓⟨ C.∘-resp-≡ʳ
                (CoconeMorphism.commute (CX.I.! {cocone-T₁ f}))
             ⟩
                 colim-T₁ g C.∘ (κ i Y C.∘ T₁ i f)
             ↑⟨ C.assoc ⟩
                 (colim-T₁ g C.∘ κ i Y) C.∘ T₁ i f
-            ↓⟨ C.∘-resp-≡
+            ↓⟨ C.∘-resp-≡ˡ
                (CoconeMorphism.commute (CY.I.! {cocone-T₁ g}))
-               C.Equiv.refl
             ⟩
                 (κ i Z C.∘ T₁ i g) C.∘ T₁ i f
             ↓⟨ C.assoc ⟩
                 κ i Z C.∘ (T₁ i g C.∘ T₁ i f)
-            ↑⟨ C.∘-resp-≡
-               C.Equiv.refl
-               (Functor.homomorphism (T i))
-            ⟩
+            ↑⟨ C.∘-resp-≡ʳ (Functor.homomorphism (T i)) ⟩
               C [ κ i Z ∘ T₁ i (g C.∘ f) ]
             ∎
           }
@@ -239,10 +239,7 @@ EndoMor-inherit-colim {C} F {I} D c =
               C [ colim-T₁ g ∘ κ i A ]
             ↓⟨ CoconeMorphism.commute (CA.I.! {cocone-T₁ g}) ⟩
               C [ κ i B ∘ T₁ i g ]
-            ↑⟨ C.∘-resp-≡
-               C.Equiv.refl
-               (Functor.F-resp-≡ (T i) f≡g)
-            ⟩
+            ↑⟨ C.∘-resp-≡ʳ (Functor.F-resp-≡ (T i) f≡g) ⟩
               C [ κ i B ∘ T₁ i f ]
             ∎
           }
@@ -258,18 +255,93 @@ EndoMor-inherit-colim {C} F {I} D c =
         ; F-resp-≡ = colim-T-resp-≡
         }
 
+    -- Cocone to construct ρ = [F₁ (κᵢ A) ∘ ρᵢ A]_{i ‌∈ I}
+    cocone-ρ : {A : C.Obj} →
+               Category.Obj (Cocones (PW-Diagram D (F₀ A)))
+    cocone-ρ {A} = record
+      { N = F₀ (colim-T₀ A)
+      ; ψ = λ i → C [ F₁ (κ i A) ∘ ρη i A ]
+      ; commute = λ {i} {j} f →
+        let open SetoidReasoning (C.hom-setoid {T₀ i (F₀ A)} {F₀ (colim-T₀ A)})
+        in begin
+          C [ F₁ (κ i A) ∘ ρη i A ]
+        ↓⟨ C.∘-resp-≡ˡ (Functor.F-resp-≡ F (CA.Ic.commute f)) ⟩
+          C [ F₁ ((κ j A) C.∘ (DA.F₁ f)) ∘ ρη i A ]
+        ↓⟨ C.∘-resp-≡ˡ (Functor.homomorphism F) ⟩
+          C [ C [ F₁ (κ j A) ∘ F₁ (DA.F₁ f) ] ∘ ρη i A ]
+        ↓⟨ C.assoc ⟩
+          C [ F₁ (κ j A) ∘ C [ F₁ (DA.F₁ f) ∘ ρη i A ] ]
+        ↓⟨ C.∘-resp-≡ʳ (lemma f) ⟩
+          C [ F₁ (κ j A) ∘ C [ ρη j A ∘ DFA.F₁ f ] ]
+        ↑⟨ C.assoc ⟩
+          C [ F₁ (κ j A) ∘ ρη j A ] C.∘ DFA.F₁ f
+        ∎
+      }
+      where
+        module CA = Colimit (c A)
+        module DA = Functor (PW-Diagram D A)
+        module DFA = Functor (PW-Diagram D (F₀ A))
+
+        -- Lemma to turn the commuting square for ρ into the equation we need
+        .lemma : {i j : I.Obj} → (f : I [ i , j ]) →
+                 C [ F₁ (DA.F₁ f) ∘ ρη i A ] C.≡ C [ ρη j A ∘ DFA.F₁ f ]
+        lemma {i} {j} f =
+          begin
+            C [ F₁ (DA.F₁ f) ∘ ρη i A ]
+          ↑⟨ C.∘-resp-≡ˡ C.identityʳ ⟩
+            C [ C [ F₁ (DA.F₁ f) ∘ C.id {F₀ (DA.F₀ i)} ] ∘ ρη i A ]
+          ↑⟨ UpTo⇒.square (D₁ f) {A} ⟩
+            C [ ρη j A ∘ C [ T₁ j (C.id {F₀ A}) ∘ (DFA.F₁ f) ] ]
+          ↓⟨ C.∘-resp-≡ʳ (C.∘-resp-≡ˡ
+             (Functor.identity (T j)))
+          ⟩
+            C [ ρη j A ∘ C [ C.id {T₀ j (F₀ A)} ∘ (DFA.F₁ f) ] ]
+          ↓⟨ C.∘-resp-≡ʳ C.identityˡ ⟩
+            C [ ρη j A ∘ DFA.F₁ f ]
+          ∎
+          where
+            open SetoidReasoning (C.hom-setoid {T₀ i (F₀ A)} {F₀ (T₀ j A)})
+
+    colim-ρ-η : (A : C.Obj) → C [ colim-T₀ (F₀ A) , F₀ (colim-T₀ A) ]
+    colim-ρ-η A = CoconeMorphism.f (CFA.I.! {cocone-ρ})
+      where
+        module CFA = Colimit (c (F₀ A))
+
     -- Natural transformation to make colim-T indeed an up-to technique
     colim-ρ : (colim-T ∘ F) ⇒ (F ∘ colim-T)
-    colim-ρ = {!!}
+    colim-ρ = record
+      { η = colim-ρ-η
+      ; commute = λ {A} {B} f →
+        let open SetoidReasoning
+                 (C.hom-setoid {colim-T₀ (F₀ A)} {F₀ (colim-T₀ B)})
+        in begin
+          C [ colim-ρ-η B ∘ colim-T₁ (F₁ f) ]
+        ↓⟨ {!!} ⟩
+          C [ F₁ (colim-T₁ f) ∘ colim-ρ-η A ]
+        ∎
+      }
+      where
+
+    colim-Endo : Endo⇒ C F C F
+    colim-Endo = record
+      { T = colim-T
+      ; ρ = colim-ρ
+      }
+
+    colim-ψ : (i : I.Obj) → UpTo⇒ (D₀ i) colim-Endo
+    colim-ψ i = record
+      { γ = record
+        { η = λ X → κ i X
+        ; commute = {!!}
+        }
+      ; square = {!!}
+      }
 
     colim-D : CC-D.Obj
     colim-D =
       record
-      { N = record
-        { T = colim-T
-        ; ρ = colim-ρ
-        }
-      ; ψ = {!!}
+      { N = colim-Endo
+      ; ψ = colim-ψ
       ; commute = {!!}
       }
 

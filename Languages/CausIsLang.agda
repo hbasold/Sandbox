@@ -40,8 +40,9 @@ open import Relation.Binary.PropositionalEquality as P
 open ≡-Reasoning
 
 open import Data.Bool using (Bool)
-open import Data.List using (List; module List; []; _∷_; length)
-open import Data.Nat using (ℕ; zero; suc)
+open import Data.List
+open import Data.Nat
+open import Data.Product
 
 open import Stream
 
@@ -66,7 +67,53 @@ record Causal (A B : Set) : Set where
   field
     F : Stream {∞} A → Stream {∞} B
     caus : ∀ {n : ℕ} {s t : Stream A} →
-           s ↓ n ≡ t ↓ n → (F s) at n ≡ (F t) at n
+           s ↓ (1 + n) ≡ t ↓ (1 + n) → (F s) at n ≡ (F t) at n
+
+record IsCaus {A B : Set} (f : Stream A → Stream B) : Set where
+  coinductive
+  field
+    out : ∀ {s t} →
+          hd s ≡ hd t →
+          hd (f s) ≡ hd (f t)
+          × (IsCaus (λ x → tl (f(scons (hd s) x))))
+
+open IsCaus public
+
+foo : ∀{A : Set} {x y : A} {u v : List A} → _≡_ {A = List A} (x ∷ u) (y ∷ v) → x ≡ y
+foo refl = refl
+
+bar : ∀{A : Set} {x y : A} {u v : List A} → _≡_ {A = List A} (x ∷ u) (y ∷ v) → u ≡ v
+bar refl = refl
+
+-- Cheat!
+postulate
+  baz : ∀{A} (s : Stream A) → s ≡ scons (hd s) (tl s)
+
+lem : ∀{A B} {f : Stream A → Stream B} → IsCaus f →
+      ∀ {n s t} → s ↓ (1 + n) ≡ t ↓ (1 + n) → (f s) at n ≡ (f t) at n
+lem caus {zero} sn=tn = proj₁ (IsCaus.out caus (foo sn=tn))
+lem caus {suc n} {s} {t} sn=tn with IsCaus.out caus {s} {t} (foo sn=tn)
+lem {f = f} caus {suc n} {s} {t} sn=tn | p , q =
+  let r = q
+      u = bar sn=tn
+      v = lem r u
+  in
+    begin
+      tl (f s) at n
+    ≡⟨ cong (λ x → tl (f x) at n) (baz s) ⟩
+      tl (f (scons (hd s) (tl s))) at n
+    ≡⟨ v ⟩
+      tl (f (scons (hd s) (tl t))) at n
+    ≡⟨ cong (λ x → tl (f (scons x (tl t))) at n) (foo sn=tn) ⟩
+      tl (f (scons (hd t) (tl t))) at n
+    ≡⟨ cong (λ x → tl (f x) at n) (sym (baz t)) ⟩
+      tl (f t) at n
+    ∎
+
+lem₂ : ∀{A B} {f : Stream A → Stream B} →
+       (∀ {n s t} → s ↓ (1 + n) ≡ t ↓ (1 + n) → (f s) at n ≡ (f t) at n) →
+       IsCaus f
+out (lem₂ p) q = p {0} (cong (λ x → x ∷ []) q) , lem₂ {!x!}
 
 lang-to-caus : ∀{A} → (A ⋆ → Bool) → (Stream A → Stream Bool)
 hd (lang-to-caus L s) = L ε
@@ -126,7 +173,7 @@ lemma-restr-extension-to-length-is-id :
   ∀ {A} {s : Stream A} (w : A ⋆) →
   (w ++ˢ s) ↓ ∥ w ∥ ≡ w
 lemma-restr-extension-to-length-is-id         []      = refl
-lemma-restr-extension-to-length-is-id {A} {s} (a ∷ w) = 
+lemma-restr-extension-to-length-is-id {A} {s} (a ∷ w) =
   begin
     ((a ∷ w) ++ˢ s) ↓ ∥ a ∷ w ∥
   ≡⟨ refl ⟩
@@ -141,6 +188,7 @@ lemma-restr-extension-to-length-is-id {A} {s} (a ∷ w) =
     a ∷ w
   ∎
 
+{-
 lemma-β-indep-of-choice : ∀ {A} {F′ : Causal A Bool}
                             {p q : NonEmptyS A} {w : A ⋆} →
                           β {A} {p} F′ w ≡ β {A} {q} F′ w
@@ -300,3 +348,4 @@ lang-iso-caus← {A} {p} {F′} {s} n =
       ≡⟨ cong (λ u → s ↓ u) (sym (lemma-length-restr n)) ⟩
         s ↓ ∥ s ↓ n ∥
       ∎
+-}

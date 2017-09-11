@@ -63,41 +63,41 @@ tl (toStr f) = toStr (λ n → f (suc n))
 
 module Bisim (S : Setoid Level.zero Level.zero) where
 
-  infix 2 _∼_
+  infix 2 _~_
 
   open Setoid S renaming (Carrier to A; isEquivalence to S-equiv)
   module SE = IsEquivalence S-equiv
 
   -- Stream equality is bisimilarity
-  record _∼_ {i : Size} (s t : Stream A) : Set where
+  record _~_ {i : Size} (s t : Stream A) : Set where
     coinductive
     field
       hd≈ : hd s ≈ hd t
-      tl∼ : ∀ {j : Size< i} → _∼_ {j} (tl s) (tl t)
-  open _∼_ public
+      tl~ : ∀ {j : Size< i} → _~_ {j} (tl s) (tl t)
+  open _~_ public
 
-  _∼[_]_ : Stream A → Size → Stream A → Set
-  s ∼[ i ] t = _∼_ {i} s t
+  _~[_]_ : Stream A → Size → Stream A → Set
+  s ~[ i ] t = _~_ {i} s t
 
-  s-bisim-refl : ∀ {i} {s : Stream A} → s ∼[ i ] s
+  s-bisim-refl : ∀ {i} {s : Stream A} → s ~[ i ] s
   hd≈ s-bisim-refl               = SE.refl
-  tl∼ (s-bisim-refl {_} {s}) {j} = s-bisim-refl {j} {tl s}
+  tl~ (s-bisim-refl {_} {s}) {j} = s-bisim-refl {j} {tl s}
 
-  s-bisim-sym : ∀ {i} {s t : Stream A} → s ∼[ i ] t → t ∼[ i ] s
+  s-bisim-sym : ∀ {i} {s t : Stream A} → s ~[ i ] t → t ~[ i ] s
   hd≈ (s-bisim-sym             p)     = SE.sym (hd≈ p)
-  tl∼ (s-bisim-sym {_} {s} {t} p) {j} =
-    s-bisim-sym {j} {tl s} {tl t} (tl∼ p)
+  tl~ (s-bisim-sym {_} {s} {t} p) {j} =
+    s-bisim-sym {j} {tl s} {tl t} (tl~ p)
 
   s-bisim-trans : ∀ {i} {r s t : Stream A} →
-                  r ∼[ i ] s → s ∼[ i ] t → r ∼[ i ] t
+                  r ~[ i ] s → s ~[ i ] t → r ~[ i ] t
   hd≈ (s-bisim-trans                 p q)     = SE.trans (hd≈ p) (hd≈ q)
-  tl∼ (s-bisim-trans {_} {r} {s} {t} p q) {j} =
-    s-bisim-trans {j} {tl r} {tl s} {tl t} (tl∼ p) (tl∼ q)
+  tl~ (s-bisim-trans {_} {r} {s} {t} p q) {j} =
+    s-bisim-trans {j} {tl r} {tl s} {tl t} (tl~ p) (tl~ q)
 
   stream-setoid : Setoid _ _
   stream-setoid = record
     { Carrier = Stream A
-    ; _≈_ = _∼_
+    ; _≈_ = _~_
     ; isEquivalence = record
       { refl  = s-bisim-refl
       ; sym   = s-bisim-sym
@@ -107,15 +107,15 @@ module Bisim (S : Setoid Level.zero Level.zero) where
 
   import Relation.Binary.EqReasoning as EqR
 
-  module ∼-Reasoning where
+  module ~-Reasoning where
     module _ where
       open EqR (stream-setoid) public
-        hiding (_≡⟨_⟩_) renaming (_≈⟨_⟩_ to _∼⟨_⟩_; begin_ to begin_; _∎ to _∎)
+        hiding (_≡⟨_⟩_) renaming (_≈⟨_⟩_ to _~⟨_⟩_; begin_ to begin_; _∎ to _∎)
 
   -- | As usual, bisimilarity implies equality at every index.
-  bisim→ext-≡ : ∀ {s t : Stream A} → s ∼ t → ∀ {n} → s at n ≈ t at n
+  bisim→ext-≡ : ∀ {s t : Stream A} → s ~ t → ∀ {n} → s at n ≈ t at n
   bisim→ext-≡ p {zero}  = hd≈ p
-  bisim→ext-≡ p {suc n} = bisim→ext-≡ (tl∼ p) {n}
+  bisim→ext-≡ p {suc n} = bisim→ext-≡ (tl~ p) {n}
 
   -- | Definition of bisimulation
   isBisim : Rel (Str A) Level.zero → Set
@@ -123,10 +123,10 @@ module Bisim (S : Setoid Level.zero Level.zero) where
     (s t : Str A) → R s t → (hd s ≈ hd t) × R (tl s) (tl t)
 
   -- | Bisimulation proof principle
-  ∃-bisim→∼ : ∀ {R} → isBisim R → (s t : Str A) → R s t → s ∼ t
-  hd≈ (∃-bisim→∼ R-isBisim s t q) = proj₁ (R-isBisim s t q)
-  tl∼ (∃-bisim→∼ R-isBisim s t q) =
-    ∃-bisim→∼ R-isBisim (tl s) (tl t) (proj₂ (R-isBisim s t q))
+  ∃-bisim→~ : ∀ {R} → isBisim R → (s t : Str A) → R s t → s ~ t
+  hd≈ (∃-bisim→~ R-isBisim s t q) = proj₁ (R-isBisim s t q)
+  tl~ (∃-bisim→~ R-isBisim s t q) =
+    ∃-bisim→~ R-isBisim (tl s) (tl t) (proj₂ (R-isBisim s t q))
 
   StrRel : Set₁
   StrRel = Rel (Str A) Level.zero
@@ -170,9 +170,9 @@ module Bisim (S : Setoid Level.zero Level.zero) where
 
   -- Compatible up-to techniques are sound
   compat-sound : {F : RelTrans (Str A)} (P : Φ-compat F) {R : StrRel} →
-                 isBisim-upto F R → (s t : Str A) → R s t → s ∼ t
+                 isBisim-upto F R → (s t : Str A) → R s t → s ~ t
   compat-sound {F} P {R} p s t sRt =
-    ∃-bisim→∼ (isBisim'→isBisim {bisimCls F R} (clsIsBisim P p))
+    ∃-bisim→~ (isBisim'→isBisim {bisimCls F R} (clsIsBisim P p))
     s t (0 , sRt)
 
   -- | Useful general up-to technique: the equivalence closure is Φ-compatible.

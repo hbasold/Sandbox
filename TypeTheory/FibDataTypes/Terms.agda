@@ -8,7 +8,7 @@ open import Categories.Category using (Category)
 
 open import Types
 
-open import Common.Context GType
+open import Context GType
   using (Ctx; Var; zero; ctx-cat; ctx-bin-coproducts)
   renaming (succ to succ′)
 open Categories.Category.Category ctx-cat
@@ -25,6 +25,7 @@ Sig = Ctx
 
 -- | Typed patterns
 data Pat : (a : GType) → Set where
+  〈〉′  : Pat unit
   var′ : ∀{a : GType}       (x : Var [ a ] a)                 → Pat a
   κ₁′  : ∀{a₁ a₂ : GType}   (p : Pat a₁)           → Pat (a₁ ⊕ a₂)
   κ₂′  : ∀{a₁ a₂ : GType}   (p : Pat a₂)           → Pat (a₁ ⊕ a₂)
@@ -33,6 +34,7 @@ data Pat : (a : GType) → Set where
 -- | Context defined by a pattern (this is either empty or contains a single
 --   variable).
 pat-ctx : ∀ {a} → Pat a → Ctx
+pat-ctx     〈〉′      = []
 pat-ctx {a} (var′ x) = [ a ]
 pat-ctx     (κ₁′ x)  = pat-ctx x
 pat-ctx     (κ₂′ x)  = pat-ctx x
@@ -59,7 +61,6 @@ mutual
   -- | A clause { q₁ ↦ t₁ ; ... ; qₙ ↦ tₙ } defines the body of a λ-abstraction
   --   of the definition of a symbol in a signature.
   record Clause {Δ : Sig} {Γ : Ctx} {a : GType} : Set where
-    inductive
     field
       body : List (
                   Σ GType (λ b →
@@ -68,7 +69,8 @@ mutual
              )
 
   -- | Terms typed in a context
-  data Term {Δ : Sig} (Γ : Ctx) : GType → Set where
+  data Term {Δ : Sig} (Γ : Ctx) : (a : GType) → Set where
+    〈〉    :                                                   Term Γ unit′
     var  : ∀{a : GType}       (x : Var Γ a)                 → Term Γ a
     κ₁   : ∀{a₁ a₂ : GType}   (t : Term {Δ} Γ a₁)           → Term Γ (a₁ ⊕ a₂)
     κ₂   : ∀{a₁ a₂ : GType}   (t : Term {Δ} Γ a₂)           → Term Γ (a₁ ⊕ a₂)
@@ -80,17 +82,11 @@ mutual
     ξ    : ∀{a : Type [ tt ]} (t : Term {Δ} Γ (ν a))        → Term Γ (unfold-ν a)
     svar : ∀{a : GType}       (f : Var Δ a)                 → Term Γ a
     abs  : ∀{a : GType}       (D : Clause {Δ} {Γ} {a})      → Term Γ a
-    rlet : ∀{a : GType} {Δ' : Sig} →
-           (Ω : Definition Δ') → Term {Δ ∐ Δ'} Γ a → Term {Δ} Γ a
 
-  -- | A definition consists of a signature and its definition
-  data DeclBlock : Sig → Set where
-    empty : DeclBlock []
-    
-  record Definition (Δ : Sig) : Set where
-    inductive
-    field
-      defs : List (Σ GType (λ a → (Var Δ a) × Clause {Δ} {[]} {a}))
+-- | A definition consists of a signature and its definition
+record Definition (Δ : Sig) : Set where
+  field
+    defs : List (Σ GType (λ a → (Var Δ a) × Clause {Δ} {[]} {a}))
 open Definition
 
 TermWDef : GType → Set
@@ -112,11 +108,6 @@ _≝_ {a = a} f c = a , (f , c)
 --------------------------------
 ------ Examples
 
--- 〈〉 : Term [] unit
--- 〈〉 = ?
-
-
-{-
 hd : ∀ {a : GType} → Term (Str a) → Term a
 hd t = π₁ (ξ q)
 
@@ -141,4 +132,3 @@ ones = Δ , def , (svar o)
       { defs =
         [ o ≝ o-def ]
       }
--}

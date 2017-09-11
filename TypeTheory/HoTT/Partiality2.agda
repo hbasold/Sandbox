@@ -5,7 +5,7 @@ open import lib.types.Paths
 open import lib.Funext
 open import Size
 
-
+{-
 -- | Coinductive delay type. This is the functor νπ̂ : Set → Set arising
 -- as the fixed point of π̂(H) = π ∘ ⟨Id, H⟩, where π : Set × Set → Set
 -- with π(X, Y) = X.
@@ -35,106 +35,87 @@ postulate
   D-coind : ∀ {S} {x y : D S} → force x == force y → x == y
 
 D-coind2 : ∀ {S} {x y : D S} → D (force x == force y) → x == y
-D-coind2 p = D-coind (force p)
+D-coind2 p = D-coind (force p
+-}
 
 module _ where
   private
     mutual
-      data #P-aux (A : Set) : {i : Size} → Set where
-        #now : {i : Size} → A → #P-aux A {↑ i}
-        #later : {i : Size} → D (#P {i} A) → #P-aux A {↑ i}
+      data #D (A : Set) (P : Set) : Set where
+        #p : #D-aux A P → (Unit → Unit) → #D A P
 
-      data #P {i : Size} (A : Set) : Set where
-        #p : #P-aux A {i} → (Unit → Unit) → #P {i} A
+      data #D-aux (A : Set) (P : Set) : Set where
+        #now : A → #D-aux A P
+        #later : P → #D-aux A P
 
-  P : ∀{i : Size} → Set → Set
-  P {i} A = #P {i} A
+  D : Set → Set → Set
+  D A X = #D A X
 
-  ∞P : ∀{i : Size} → Set → Set
-  ∞P {i} A = D (#P {i} A)
-
-  now : ∀ {i} {A} → A → P {↑ i} A
+  now : ∀ {A X} → A → D A X
   now a = #p (#now a) _
 
-  later : ∀ {i} {A} → ∞P {i} A → P {↑ i} A
+  later : ∀ {A X} → X → D A X
   later x = #p (#later x) _
 
-  P-out : ∀ {A} → P A → A ⊔ ∞P A
-  P-out (#p (#now a) _)   = inl a
-  P-out (#p (#later x) _) = inr x
+  D₁ : ∀ {A P₁ P₂} → (P₁ → P₂) → (D A P₁ → D A P₂)
+  D₁ f (#p (#now a) _)   = now a
+  D₁ f (#p (#later x) _) = later (f x)
 
-  ∞P-intro : ∀ {A X : Set} → (X → A ⊔ X) → (X → ∞P A)
-  ∞P-intro {A} {X} f = ∞P-intro'
---    match (f x) withl D-intro2 now withr (D-intro2 (later ∘ ∞P-intro'))
+  record P {i : Size} (A : Set) : Set where
+    coinductive
+    field
+      #force : ∀ {j : Size< i} → D A (P {j} A)
+  open P
+
+  force : ∀ {A} → P A → D A (P A)
+  force x = #force x
+
+  P-intro : ∀ {A X : Set} → (X → D A X) → (X → P A)
+  P-intro {A} {X} f = P-intro'
     where
-      ∞P-intro' : X → ∞P A
-      force (∞P-intro' x) =
-        match (f x) withl now withr (λ x' → later (∞P-intro' x'))
+      P-intro' : ∀ {i} → X → P {i} A
+      #force (P-intro' x) {j} = D₁ (P-intro' {j}) (f x)
 
   postulate  -- HIT
-    weak~ : ∀{A} → (x : ∞P A) → (later x == force x)
+    weak~ : ∀{A X : Set} → (force* : X → D A X) →
+            (x : X) → (later x == force* x)
 
   -- | Extra module for recursion using sized types.
   -- This is convenient, as we can use the functor D in the definition, which
   -- in turn simplifies proofs.
-  module PRec {A} {X : Set}
-    (now* : A → X)
-    (later* : D X → X)
-    (weak~* : (x : D X) → (later* x == force x))
+  module DRec {A B : Set} {P' Y : Set}
+    (now* : A → D B Y)
+    (later* : P A → D B Y)
+    (force* : Y → D B Y)
+    (weak~* : (x : P A) → (later* x == force x))
     where
-      f : ∀ {i} → P {i} A → X
+      f : D A P' → D B Y
       f = f-aux phantom where
-        f-aux : ∀ {i} → Phantom weak~* → #P {i} A → X
-        f-aux phantom (#p (#now a) _)        = now* a
-        f-aux phantom (#p (#later {j} x') _) = later* (D₁ (f {j}) x')
+        f-aux : Phantom weak~* → D A P' → D B Y
+        f-aux phantom (#p (#now a) _)   = now* a
+        f-aux phantom (#p (#later x) _) = later* x
 
       postulate      -- HIT
-        weak~-β : (x : ∞P A) → ap f (weak~ x) == weak~* (D₁ f x)
+        weak~-β : (x : P') → ap f (weak~ force* x) == weak~* x
 
-  module PElim {A} {S : P A → Set}
-    (now* : ∀(a : A) → S (now a))
-    (later* : (x : ∞P A) → (x_rec : D (S (force x))) → S (later x))
-    (weak~* : (x : ∞P A) → (x_rec : D (S (force x))) →
-              (later* x x_rec == (force x_rec) [ S ↓ (weak~ x) ]))
+{-
+  module PElim {A X} {S : D A X → Set}
+    (now* : (a : A) → S (now a))
+    (later* : (x : X) → S (later x))
+    (force*₁ : (x : X) → D A X)
+    (force*₂ : (x : X) → S (force*₁ x))
+    (weak~* : (x : X) → -- (x_rec : S
+              (later* x == (force*₂ x) [ S ↓ (weak~ force*₁ x) ]))
     where
-      g-aux : Phantom weak~* → (y : ∞P A) → D (S (force y))
-
-      f-aux : Phantom weak~* → (x : P A) → S x
-      f-aux phantom (#p (#now a) _)    = now* a
-      f-aux phantom (#p (#later x') _)
-        = later* x' (g-aux phantom x') -- (↑D₁ S f x')
-
-      force (g-aux phantom y) = f-aux phantom (force y)
-
-      g : (y : ∞P A) → D (S (force y))
-      g = g-aux phantom
-
-      f : (x : P A) → S x
+      f : (x : D A X) → S x
       f = f-aux phantom
-
-      g-is-D₁f : (y : ∞P A) → g y == ↑D₁ S f y
-      g-is-D₁f y = D-coind lem
         where
-          lem : force (g y) == force (↑D₁ S f y)
-          lem =
-            force (g y)
-              =⟨ idp ⟩
-            f (force y)
-              =⟨ idp ⟩
-            force (↑D₁ S f y)
-            ∎
-
-      f-homomorphism : (y : ∞P A) → f (later y) == later* y (↑D₁ S f y)
-      f-homomorphism y =
-          f (later y)
-        =⟨ idp ⟩
-          later* y (g y)
-        =⟨ g-is-D₁f y |in-ctx later* y ⟩
-          later* y (↑D₁ S f y)
-        ∎
-
-      postulate      -- HIT
-        weak~-β : (x : ∞P A) → apd f (weak~ x) == weak~* x (g x)
+          f-aux : Phantom weak~* → (x : D A X) → S x
+          f-aux phantom (#p (#now a) _)   = now* a
+          f-aux phantom (#p (#later x) _) = later* x
+-}
+--      postulate      -- HIT
+--        weak~-β : (x : X) → apd f (weak~ force*₁ x) == weak~* x
 
 {-
       weak~-β₂ : (x : ∞P A) →
@@ -143,13 +124,63 @@ module _ where
       weak~-β₂ = ?
 -}
 
-open PRec public renaming (f to P-rec)
+open DRec public renaming (f to D-rec)
+{-
 open PElim public
   renaming (f to P-elim; g to ∞P-elim; f-homomorphism to P-elim-hom;
            weak~-β to elim-weak~-β)
 
+-}
+
 module Bla where
 
+⊥ : ∀ {A} → P A
+⊥ = P-intro later unit
+
+-- | Copairing of morphisms
+[_,_] : ∀ {i j k} {A : Type i} {B : Type j} {C : Type k}
+  (l : A → C) (r : B → C) → (x : Coprod A B) → C
+[ f , g ] x = match x withl f withr g
+
+id-D : ∀ {A} → D A (P A) → D A (P A)
+id-D {A} = D-rec now later force (weak~ force)
+           --(idf A) (idf (P A)) (λ x → force x) (weak~ (λ x → force x))
+
+D₁-force : ∀ {A P₁ P₂} → (force* : P₁ → D A P₁) → (f : P₁ → P₂) → (x : P₁)
+           → later (f x) == D₁ f (force* x)
+D₁-force force* f x =
+  later (f x)
+    =⟨ idp ⟩
+  D₁ f (later x)
+    =⟨ weak~ force* x |in-ctx (D₁ f) ⟩
+  D₁ f (force* x)
+    ∎
+
+-- | Direct definition of bind
+bind : ∀ {A B} → (A → P B) → (P A → P B)
+bind {A} {B} f x = P-intro {X = P A ⊔ P B} [ u , v ] (inl x)
+  where
+    elim-A : A → D B (P A ⊔ P B)
+    elim-A a =
+      D-rec now
+            (later ∘ inr)
+            (D₁ inr ∘ force)
+            (D₁-force force inr)
+            (force (f a))
+
+    u : P A → D B (P A ⊔ P B)
+    u x = D-rec
+          elim-A
+          (later ∘ inl)
+          (later ∘ inl) -- this should be force ...
+          (λ _ → idp)
+          (force x)
+
+    v : P B → D B (P A ⊔ P B)
+    v = D₁ inr ∘ force
+
+
+{-
 -- | Copairing of morphisms
 [_,_] : ∀ {i j k} {A : Type i} {B : Type j} {C : Type k}
   (l : A → C) (r : B → C) → (x : Coprod A B) → C
@@ -199,7 +230,7 @@ bind {A} {B} f = P-rec f later weak~
             η ∘ f == P₁ f ∘ η
 η-natural f = λ=-nondep (λ x → idp)
   where
-    open FunextNonDep
+n    open FunextNonDep
 
 μ-natural : ∀ {A B} → (f : A → B) →
             μ ∘ P₁ (P₁ f) == P₁ f ∘ μ
@@ -329,3 +360,4 @@ later-inj u v p = inr-inj u v lem
               (later-= u p)
                 == (force p) [ (λ x' → x' ~ y → x' == y) ↓ (weak~ u) ]
     weak~-= u p = {!!}
+-}

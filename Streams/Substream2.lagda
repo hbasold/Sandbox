@@ -5,44 +5,102 @@ module Substream2 where
 
 %<*imports>
 \begin{code}
-open import Streams
 open import Data.Empty
 open import Relation.Binary hiding (Rel)
 open import Relation.Binary.PropositionalEquality as P
 open import Data.Product
 open import Function
-open import Function.Equivalence hiding (_∘_)
-
-Rel : Set → Set → Set₁
-Rel X Y = REL X Y _
-
+open import Function.Equivalence hiding (_∘_; sym)
 \end{code}
 %</imports>
 
+%<*streams>
+\begin{code}
+-- | Streams (with size annotations to ease definitions).
+record Stream (A : Set) : Set where
+  coinductive
+  field
+    hd : A
+    tl : Stream A
+open Stream public
+
+-- | Stream equality is bisimilarity
+record _~_ {A : Set} (s t : Stream A) : Set where
+  coinductive
+  field
+    hd~ : s .hd ≡ t .hd
+    tl~ : s .tl ~ t .tl
+open _~_ public
+
+~refl : ∀{A} {s : Stream A} → s ~ s
+hd~ ~refl = refl
+tl~ ~refl = ~refl
+
+~trans : ∀{A} {r s t : Stream A} → r ~ s → s ~ t → r ~ t
+hd~ (~trans p q) = trans  (hd~ p) (hd~ q)
+tl~ (~trans p q) = ~trans (tl~ p) (tl~ q)
+
+~sym : ∀{A} {s t : Stream A} → s ~ t → t ~ s
+hd~ (~sym p) = sym  (hd~ p)
+tl~ (~sym p) = ~sym (tl~ p)
+\end{code}
+%</streams>
+
+%<*relations>
+\begin{code}
+Rel : Set → Set → Set₁
+Rel X Y = REL X Y _
+-- Rel X Y = X → Y → Set
+\end{code}
+%</relations>
+
 %<*selector-type>
 \begin{code}
+Pres : Set → Set → Set
+Pres S _ = S
+
+Drop : Set → Set → Set
+Drop _ Sμ = Sμ
+
 data Selμ' (S : Set) : Set where
-  pres : S → Selμ' S
-  drop : Selμ' S → Selμ' S
+  pres : Pres S (Selμ' S) → Selμ' S
+  drop : Drop S (Selμ' S) → Selμ' S
 
-rec-selμ : {S X : Set} → (S → X) → (X → X) → Selμ' S → X
-rec-selμ p d (pres x) = p x
-rec-selμ p d (drop u) = d (rec-selμ p d u)
+-- | Non-dependent iteration principle for Selμ
+iter-selμ : {S X : Set} → (Pres S X → X) → (Drop S X → X) → Selμ' S → X
+iter-selμ p d (pres x) = p x
+iter-selμ p d (drop u) = d (iter-selμ p d u)
 
+-- | Functoriality of Selμ
 Selμ₁ : {X Y : Set} → (X → Y) → Selμ' X → Selμ' Y
-Selμ₁ f = rec-selμ (pres ∘ f) drop
+Selμ₁ f = iter-selμ (pres ∘ f) drop
 
-Selμ₂ : {X Y : Set} → Rel X Y → Rel (Selμ' X) (Selμ' Y)
-Selμ₂ R (pres x) (pres y) = R x y
-Selμ₂ R (pres x) (drop v) = ⊥
-Selμ₂ R (drop u) (pres y) = ⊥
-Selμ₂ R (drop u) (drop v) = Selμ₂ R u v
 
+-- PresL : Set → (Pres Set → Set
+
+
+ind-selμ : {S : Set} {X : Selμ' S → Set} →
+           ((s : S) → X (pres s)) →
+           ((u : Selμ' S) → X u → X (drop u)) →
+           (u : Selμ' S) → X u
+ind-selμ p d (pres x) = p x
+ind-selμ p d (drop u) = d u (ind-selμ p d u)
+
+-- | Predicate lifting of Selμ
+data Selμp {X : Set} (P : X → Set) : Selμ' X → Set where
+  presp : ∀{x} → P x       → Selμp P (pres x)
+  dropp : ∀{u} → Selμp P u → Selμp P (drop u)
+
+
+-- | Relation lifting of Selμ
+data Selμ₂ {X Y : Set} (R : Rel X Y) : Rel (Selμ' X) (Selμ' Y) where
+  pres₂ : ∀{x y} → R x y       → Selμ₂ R (pres x) (pres y)
+  drop₂ : ∀{u v} → Selμ₂ R u v → Selμ₂ R (drop u) (drop v)
+
+-- | Functoriality of relation lifting of Selμ
 Selμ₂₁ : {X Y : Set} → (R S : Rel X Y) → R ⇒ S → Selμ₂ R ⇒ Selμ₂ S
-Selμ₂₁ R S R⇒S {pres x} {pres y} p = R⇒S p
-Selμ₂₁ R S R⇒S {pres x} {drop j} ()
-Selμ₂₁ R S R⇒S {drop u} {pres y} ()
-Selμ₂₁ R S R⇒S {drop u} {drop v} p = Selμ₂₁ R S R⇒S {u} p
+Selμ₂₁ R S R⇒S (pres₂ xRy) = pres₂ (R⇒S xRy)
+Selμ₂₁ R S R⇒S (drop₂ p)   = drop₂ (Selμ₂₁ R S R⇒S p)
 
 record Sel : Set where
   coinductive
@@ -91,13 +149,11 @@ Sel-Bisim R = ∀ s t → R s t → Selμ₂ R (s .out) (t .out)
 
 Sel-Bisim→≈ : (R : Rel Sel Sel) → Sel-Bisim R → R ⇒ _≈_
 Sel-Bisim→≈ R R-isBisim {x} {y} p .out≈ =
-  do-ind (x .out) (y .out) (R-isBisim x y p)
+  do-ind (R-isBisim x y p)
   where
-    do-ind : (u v : Selμ) → Selμ₂ R u v → u ≈μ v
-    do-ind (pres x') (pres y') q = pres≈ (Sel-Bisim→≈ R R-isBisim q)
-    do-ind (pres x') (drop v') ()
-    do-ind (drop u') (pres y') ()
-    do-ind (drop u') (drop v') q = drop≈ (do-ind u' v' q)
+    do-ind : {u v : Selμ} → Selμ₂ R u v → u ≈μ v
+    do-ind (pres₂ xRy) = pres≈ (Sel-Bisim→≈ R R-isBisim xRy)
+    do-ind (drop₂ q)   = drop≈ (do-ind q)
 
 ≈-refl : ∀ {x} → x ≈ x
 ≈μ-refl : ∀ {u} → u ≈μ u
@@ -154,11 +210,12 @@ Graph f x y = f x ≈ y
 
 hom-graph-isBisimμ : {X : Set} → (c : X → Selμ' X) (h : X → Sel) → Sel-Hom c h →
   ∀ {u v w} → v ≈μ w → v ≈μ (Selμ₁ h u) → Selμ₂ (Graph h) u w
-hom-graph-isBisimμ c h p {pres x} (pres≈ q) (pres≈ r) = ≈-trans (≈-sym r) q
+hom-graph-isBisimμ c h p {pres x} (pres≈ q) (pres≈ r) =
+  pres₂ (≈-trans (≈-sym r) q)
 hom-graph-isBisimμ c h p {drop u} (pres≈ q) ()
 hom-graph-isBisimμ c h p {pres x} (drop≈ q) ()
 hom-graph-isBisimμ c h p {drop u} (drop≈ q) (drop≈ r) =
-  hom-graph-isBisimμ c h p {u} q r
+  drop₂ (hom-graph-isBisimμ c h p {u} q r)
 
 hom-graph-isBisim : {X : Set} → (c : X → Selμ' X) (h : X → Sel) → Sel-Hom c h →
                     Sel-gBisim c out (Graph h)
@@ -198,7 +255,7 @@ xcomp (drop u') (drop v') = drop (xcomp (drop u') v')
 -}
 
 comp-p : Sel → (Selμ → Selμ' (Sel × Sel))
-comp-p x' v = rec-selμ p' d' v
+comp-p x' v = iter-selμ p' d' v
   where
     p' : Sel → Selμ' (Sel × Sel)
     p' y' = pres (x' , y')
@@ -207,7 +264,7 @@ comp-p x' v = rec-selμ p' d' v
     d' v' = drop v'
 
 comp-d : (Selμ → Selμ' (Sel × Sel)) → Selμ → Selμ' (Sel × Sel)
-comp-d cu' v = rec-selμ p' d' v cu'
+comp-d cu' v = iter-selμ p' d' v cu'
   where
     p' : Sel → (Selμ → Selμ' (Sel × Sel)) → Selμ' (Sel × Sel)
     p' y' cu' = drop (cu' (y' .out))
@@ -217,7 +274,7 @@ comp-d cu' v = rec-selμ p' d' v cu'
     d' C cu' = drop (C cu')
 
 comp-coalg : Sel × Sel → Selμ' (Sel × Sel)
-comp-coalg (x , y) = rec-selμ comp-p comp-d (x .out) (y .out)
+comp-coalg (x , y) = iter-selμ comp-p comp-d (x .out) (y .out)
 
 comp : Sel × Sel → Sel
 comp = corec-sel comp-coalg
@@ -243,7 +300,7 @@ u         •μ (drop v') = drop (u •μ v')
     comp' (x , y) = x • y
 
     comp'-homμ : ∀ u v →
-      (u •μ v) ≈μ (Selμ₁ comp' (rec-selμ comp-p comp-d u v))
+      (u •μ v) ≈μ (Selμ₁ comp' (iter-selμ comp-p comp-d u v))
     comp'-homμ (pres x') (pres y') = pres≈ ≈-refl
     comp'-homμ (pres x') (drop v') = drop≈ (comp'-homμ (pres x') v')
     comp'-homμ (drop u') (pres y') = drop≈ (comp'-homμ u' (y' .out))
@@ -283,6 +340,20 @@ s ≤[ x ] t = s ~ filter x t
 _≤μ[_]_ : ∀{A} → Stream A → Selμ → Stream A → Set
 s ≤μ[ x ] t = s ~ filterμ x t
 
+{- Substream relatio without using mutual
+data _≤μ'[_]_ {A : Set} (s : Stream A) (R : Stream A → Stream A → Set) (t : Stream A) : Set where
+  ma : hd s ≡ hd t → R (tl s) (tl t) → s ≤μ'[ R ] t
+  sk : s ≤μ'[ R ](tl t) → s ≤μ'[ R ] t
+
+record _≤_ {A : Set} (s t : Stream A) : Set where
+  coinductive
+  field out≤ : s ≤μ'[ _≤_ ] t
+
+open _≤_ public
+
+_≤μ_ : {A : Set} → Stream A → Stream A → Set
+_≤μ_ = _≤μ'[ _≤_ ]_
+-}
 
 mutual
   record _≤_ {A : Set} (s t : Stream A) : Set where

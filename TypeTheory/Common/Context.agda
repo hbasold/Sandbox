@@ -1,10 +1,11 @@
-module Common.Context (Ty : Set) where
+module Common.Context  where
 
+import Level
 open import Data.Nat as Nat
 open import Data.List as List
 import Level
 open import Relation.Binary.PropositionalEquality as PE hiding ([_])
-open import Relation.Binary using (Setoid)
+open import Relation.Binary -- using (Setoid; Rel; IsEquivalence)
 open ≡-Reasoning
 open import Function as Fun hiding (_∘′_)
 open import Data.Sum as Sum hiding ([_,_])
@@ -12,22 +13,18 @@ open import Categories.Category using (Category)
 
 open import Common.SumProperties
 
-postulate
-  η-≡ : {A : Set} {B : A → Set}
-         {f₁ : (x : A) → B x}{f₂ : (y : A) → B y} →
-         ((x : A) → f₁ x ≡ f₂ x) → f₁ ≡ f₂
-
 -------------------------
 ---- Type contexts
 
-Ctx = List Ty
+Ctx : Set → Set
+Ctx Ty = List Ty
 
 -- | De Bruijn variable indexing
-data Var : (Γ : Ctx) (a : Ty) → Set where
+data Var {Ty : Set} : (Γ : Ctx Ty) (a : Ty) → Set where
   zero : ∀{Γ a}                          → Var (a ∷ Γ) a
   succ : ∀{Γ b} (a : Ty) → (x : Var Γ a) → Var (b ∷ Γ) a
 
-data _≅V_ : ∀{Γ Γ' : Ctx} {a a' : Ty} → Var Γ a → Var Γ' a' → Set where
+data _≅V_ {Ty} : ∀ {Γ Γ' : Ctx Ty} {a a' : Ty} → Var Γ a → Var Γ' a' → Set where
   zero : ∀ {Γ Γ'} {a a'}
          → zero {Γ = Γ} {a} ≅V zero {Γ = Γ'} {a'}
 
@@ -36,77 +33,113 @@ data _≅V_ : ∀{Γ Γ' : Ctx} {a a' : Ty} → Var Γ a → Var Γ' a' → Set 
           → x ≅V x'
           → succ {b = b} a x ≅V succ {b = b'} a' x'
 
-Vrefl : ∀ {Γ : Ctx} {a : Ty} {x : Var Γ a} → x ≅V x
+Vrefl : ∀ {Ty} {Γ} {a : Ty} {x : Var Γ a} → x ≅V x
 Vrefl {x = zero}  = zero
 Vrefl {x = succ _ t} = succ Vrefl
 
-Vsym : ∀ {Γ Γ' a a'} {x : Var Γ a} {x' : Var Γ' a'} → x ≅V x' → x' ≅V x
+Vsym : ∀ {Ty} {Γ Γ'} {a a' : Ty} {x : Var Γ a} {x' : Var Γ' a'}
+       → x ≅V x' → x' ≅V x
 Vsym zero      = zero
-Vsym (succ [x]) = succ (Vsym [x])
+Vsym {Ty} (succ [x]) = succ (Vsym [x])
 
-Vtrans : ∀ {Γ Γ' Γ'' a a' a''} {x : Var Γ a} {x' : Var Γ' a'} {x'' : Var Γ'' a''}
-       → x ≅V x' → x' ≅V x'' → x ≅V x''
+Vtrans : ∀ {Ty} {Γ Γ' Γ''} {a a' a'' : Ty}
+           {x : Var Γ a} {x' : Var Γ' a'} {x'' : Var Γ'' a''}
+         → x ≅V x' → x' ≅V x'' → x ≅V x''
 Vtrans zero     zero      = zero
 Vtrans (succ eq) (succ eq') = succ (Vtrans eq eq')
 
 -- Note: makes the equality homogeneous in Γ and a
-≅V-setoid : ∀ {Γ a} → Setoid _ _
-≅V-setoid {Γ} {a} = record
+≅V-setoid : ∀ {Ty} {Γ} {a : Ty} → Setoid _ _
+≅V-setoid {Ty} {Γ} {a} = record
   { Carrier = Var Γ a
   ; _≈_ = _≅V_
   ; isEquivalence = record
     { refl = Vrefl ; sym = Vsym ; trans = Vtrans }
   }
 
-arr : (Γ Δ : Ctx) → Set
-arr Γ Δ = ∀ (a : Ty) → Var Γ a → Var Δ a
+arr : ∀ {Ty} → (Γ Δ : Ctx Ty) → Set
+arr {Ty} Γ Δ = ∀ (a : Ty) → Var Γ a → Var Δ a
 
-_∘′_ : {Γ Δ Ξ : Ctx} (ρ : arr Δ Ξ) (γ : arr Γ Δ) → arr Γ Ξ
+_►_ = arr
+-- _▹_ = arr
+
+infix 4 _≡C_
+
+record _≡C_ {Ty} {Γ Δ : Ctx Ty} (ρ : arr Γ Δ) (γ : arr Γ Δ) : Set where
+  field
+    ≡C-proof : ∀ {a} {x} → ρ a x ≡ γ a x
+open _≡C_
+
+_≈_ = _≡C_
+
+Crefl : ∀ {Ty} {Γ Δ : Ctx Ty} → Reflexive (_≡C_ {Γ = Γ} {Δ})
+Crefl = record { ≡C-proof = PE.refl }
+Csym : ∀ {Ty} {Γ Δ : Ctx Ty} → Symmetric (_≡C_ {Γ = Γ} {Δ})
+Csym p = record { ≡C-proof = PE.sym (≡C-proof p) }
+Ctrans : ∀ {Ty} {Γ Δ : Ctx Ty} → Transitive (_≡C_ {Γ = Γ} {Δ})
+Ctrans p₁ p₂ = record { ≡C-proof = PE.trans (≡C-proof p₁) (≡C-proof p₂) }
+
+≡C-equiv : ∀ {Ty} {Γ Δ : Ctx Ty} → IsEquivalence (_≡C_ {Γ = Γ} {Δ})
+≡C-equiv =
+  record
+  { refl = Crefl
+  ; sym = Csym
+  ; trans = Ctrans
+  }
+
+≡C-setoid : ∀ {Ty} {Γ Δ : Ctx Ty} → Setoid _ _
+≡C-setoid {_} {Γ} {Δ} = record
+  { Carrier = arr Γ Δ
+  ; _≈_ = _≡C_
+  ; isEquivalence = ≡C-equiv
+  }
+
+_∘′_ : ∀ {Ty} {Γ Δ Ξ : Ctx Ty} (ρ : Δ ► Ξ) (γ : Γ ► Δ) → Γ ► Ξ
 _∘′_ ρ γ = λ a x → ρ a (γ a x)
 
-id′ : {Γ : Ctx} →  arr Γ Γ
-id′ = λ _ x → x
+_●_ = _∘′_
 
-comp-resp-≡ : ∀ {Γ Δ Ξ : Ctx} {ρ ρ' : arr Δ Ξ} {γ γ' : arr Γ Δ} →
-              ρ ≡ ρ' → γ ≡ γ' → ρ ∘′ γ ≡ ρ' ∘′ γ'
-comp-resp-≡ {Γ} {Δ} {Ξ} {ρ} {ρ'} {γ} {γ'} ρ≡ρ' γ≡γ' =
-  begin
-    ρ ∘′ γ
-  ≡⟨ refl ⟩
-    (λ a x → ρ a (γ a x))
-  ≡⟨ cong (λ u → (λ a x → ρ a (u a x))) γ≡γ' ⟩
-    (λ a x → ρ a (γ' a x))
-  ≡⟨ cong (λ u → (λ a x → u a (γ' a x))) ρ≡ρ' ⟩
-    (λ a x → ρ' a (γ' a x))
-  ≡⟨ refl ⟩
-    (ρ' ∘′ γ')
-  ∎
+ctx-id : ∀ {Ty} {Γ : Ctx Ty} →  arr Γ Γ
+ctx-id = λ _ x → x
+
+comp-resp-≡C : ∀ {Ty} {Γ Δ Ξ : Ctx Ty} {ρ ρ' : arr Δ Ξ} {γ γ' : arr Γ Δ} →
+               ρ ≡C ρ' → γ ≡C γ' → ρ ∘′ γ ≡C ρ' ∘′ γ'
+comp-resp-≡C {_} {Γ} {Δ} {Ξ} {ρ} {ρ'} {γ} {γ'} ρ≡ρ' γ≡γ'
+  = record { ≡C-proof = p }
+  where
+    p : ∀ {a} {x} → (ρ ∘′ γ) a x ≡ (ρ' ∘′ γ') a x
+    p {a} {x} =
+      begin
+        (ρ ∘′ γ) a x
+      ≡⟨ refl ⟩
+        ρ a (γ a x)
+      ≡⟨ cong (λ u → ρ a u) (≡C-proof γ≡γ') ⟩
+        ρ a (γ' a x)
+      ≡⟨ ≡C-proof ρ≡ρ' ⟩
+        ρ' a (γ' a x)
+      ≡⟨ refl ⟩
+        (ρ' ∘′ γ') a x
+      ∎
 
 -- | Contexts form a category
-ctx-cat : Category Level.zero Level.zero Level.zero
-ctx-cat = record
-   { Obj = Ctx
+ctx-cat : Set → Category Level.zero Level.zero Level.zero
+ctx-cat Ty = record
+   { Obj = Ctx Ty
    ; _⇒_ = arr
-   ; _≡_ = PE._≡_
+   ; _≡_ = _≡C_
    ; _∘_ = _∘′_
-   ; id = id′
-   ; assoc = refl
-   ; identityˡ = refl
-   ; identityʳ = refl
-   ; equiv = PE.isEquivalence
-   ; ∘-resp-≡ = comp-resp-≡
+   ; id = ctx-id
+   ; assoc = record { ≡C-proof = refl }
+   ; identityˡ = record { ≡C-proof = refl }
+   ; identityʳ = record { ≡C-proof = refl }
+   ; equiv = ≡C-equiv
+   ; ∘-resp-≡ = comp-resp-≡C
    }
-
-open Categories.Category.Category ctx-cat
-  renaming ( _⇒_ to _▹_
-           ; _≡_ to _≈_
-           ; _∘_ to _●_
-           ; id  to ctx-id
-           )
 
 -------------------------
 ---- Coproduct structure on contexts
 
+{-
 _⊕_ : Ctx → Ctx → Ctx
 Γ₁ ⊕ Γ₂ = Γ₁ ++ Γ₂
 
@@ -191,8 +224,9 @@ split-lemma (b ∷ Γ₁) Γ₂ a  (succ .a x) =
                   [ in₁ {Γ₁} {Γ₂} , in₂ ] a x ≡ ctx-id a x
 ⊕-is-coprod-arg {Γ₁} {Γ₂} = split-lemma Γ₁ Γ₂
 
-⊕-is-coprod : ∀{Γ₁ Γ₂ : Ctx} → [ in₁ {Γ₁} {Γ₂} , in₂ ] ≡ ctx-id
-⊕-is-coprod {Γ₁} =
+⊕-is-coprod : ∀{Γ₁ Γ₂ : Ctx} → [ in₁ {Γ₁} {Γ₂} , in₂ ] ≡C ctx-id
+⊕-is-coprod {Γ₁} = {!!}
+{-
   η-≡ {f₁ = [ in₁ {Γ₁} , in₂ ]}
       {f₂ = ctx-id}
       (λ (a : Ty) →
@@ -200,6 +234,7 @@ split-lemma (b ∷ Γ₁) Γ₂ a  (succ .a x) =
             {f₂ = ctx-id a}
             (⊕-is-coprod-arg {Γ₁} a)
        )
+-}
 
 ●-distr-copair₁ˡ : ∀{Γ₁ Γ₂ Δ : Ctx}
                    (h : (Γ₁ ⊕ Γ₂) ▹ Δ) (a : Ty) (x : Var (Γ₁ ⊕ Γ₂) a) →
@@ -217,24 +252,36 @@ split-lemma (b ∷ Γ₁) Γ₂ a  (succ .a x) =
 ●-distr-copairˡ : ∀{Γ₁ Γ₂ Δ : Ctx} (h : (Γ₁ ⊕ Γ₂) ▹ Δ) →
                  [ h ● in₁ {Γ₁} {Γ₂} , h ● in₂ {{Γ₁}} {{Γ₂}} ]
                  ≡ h ● [ in₁ {Γ₁} {Γ₂} , in₂ ]
-●-distr-copairˡ {Γ₁} h = η-≡ (λ a → η-≡ (●-distr-copair₁ˡ {Γ₁} h a))
+●-distr-copairˡ {Γ₁} h = {!!}
+  -- η-≡ (λ a → η-≡ (●-distr-copair₁ˡ {Γ₁} h a))
 
 ⊕-is-coprod₁ : ∀{Γ₁ Γ₂ Δ : Ctx} {f : Γ₁ ▹ Δ} {g : Γ₂ ▹ Δ} {h : (Γ₁ ⊕ Γ₂) ▹ Δ} →
-               h ● in₁ ≡ f → h ● in₂ ≡ g → [ f , g ] ≡ h
-⊕-is-coprod₁ {Γ₁} {Γ₂} {Δ} {f} {g} {h} h●in₁≡f h●in₂≡g =
-  begin
-    [ f , g ]
-  ≡⟨ cong (λ u → [ u , g ]) (sym h●in₁≡f) ⟩
-    [ h ● in₁ {Γ₁} , g ]
-  ≡⟨ cong (λ u → [ h ● in₁ {Γ₁} , u ]) (sym h●in₂≡g) ⟩
-    [ h ● in₁ {Γ₁} , h ● in₂ ]
-  ≡⟨ ●-distr-copairˡ {Γ₁} h ⟩
-    h ● [ in₁ {Γ₁}, in₂ ]
-  ≡⟨ cong (λ u → h ● u) (⊕-is-coprod {Γ₁}) ⟩
-    h ● ctx-id
-  ≡⟨ refl ⟩
-    h
-  ∎
+               h ● in₁ ≡C f → h ● in₂ ≡C g → [ f , g ] ≡C h
+⊕-is-coprod₁ {Γ₁} {Γ₂} {Δ} {f} {g} {h} h●in₁≡f h●in₂≡g
+  = record { ≡C-proof = p }
+  where
+    p : ∀ {a} {x} → [ f , g ] a x ≡ h a x
+    p {a} {x} =
+      begin
+        [ f , g ] a x
+      ≡⟨ refl ⟩
+        ([ f a , g a ]′) (split x)
+      ≡⟨ cong (λ u → [ u , g a ]′ (split x)) {!!} ⟩
+        ([ (h ● in₁ {Γ₁}) a , g a ]′) (split x)
+      ≡⟨ {!!} ⟩
+        h a x
+      ∎
+{-
+        [ h ● in₁ {Γ₁} , g ]
+      ≡⟨ cong (λ u → [ h ● in₁ {Γ₁} , u ]) (sym h●in₂≡g) ⟩
+        [ h ● in₁ {Γ₁} , h ● in₂ ]
+      ≡⟨ ●-distr-copairˡ {Γ₁} h ⟩
+        h ● [ in₁ {Γ₁}, in₂ ]
+      ≡⟨ cong (λ u → h ● u) (⊕-is-coprod {Γ₁}) ⟩
+        h ● ctx-id
+      ≡⟨ refl ⟩
+        h
+  -}
 
 commute-in₁-arg : ∀ {Γ₁ Γ₂ Δ : Ctx} {f : Γ₁ ▹ Δ} {g : Γ₂ ▹ Δ}
                     (a : Ty) (x : Var Γ₁ a) →
@@ -257,14 +304,10 @@ commute-in₁-arg {b ∷ Γ₁} {Γ₂} {Δ} {f} {g} a (succ .a x) =
     f a (succ a x)
   ∎
 
-commute-in₁ : {Γ₁ Γ₂ Δ : Ctx} {f : Γ₁ ▹ Δ} {g : Γ₂ ▹ Δ} → [ f , g ] ● in₁ ≈ f
-commute-in₁ {Γ₁} {Γ₂} {Δ} {f} {g} =
-  η-≡ {f₁ = [ f , g ] ● in₁}
-      {f₂ = f}
-      (λ a → η-≡ {f₁ = ([ f , g ] ● in₁) a}
-                 {f₂ = f a}
-                 (commute-in₁-arg {f = f} {g = g} a)
-      )
+commute-in₁ : (Γ₁ : Ctx) → (Γ₂ : Ctx) → {Δ : Ctx} {f : Γ₁ ▹ Δ} {g : Γ₂ ▹ Δ}
+              → ([ f , g ] ● in₁) ≡C f
+commute-in₁ Γ₁ Γ₂ {Δ} {f} {g} =
+  record { ≡C-proof = λ {a} {x} → commute-in₁-arg {f = f} {g} a x }
 
 commute-in₂-arg : ∀ {Γ₁ Γ₂ Δ : Ctx} {f : Γ₁ ▹ Δ} {g : Γ₂ ▹ Δ}
                     (a : Ty) (x : Var Γ₂ a) →
@@ -287,14 +330,10 @@ commute-in₂-arg {tt ∷ Γ₁} {Γ₂} {Δ} {f} {g} a x =
     g a x
   ∎
 
-commute-in₂ : {Γ₁ Γ₂ Δ : Ctx} {f : Γ₁ ▹ Δ} {g : Γ₂ ▹ Δ} → [ f , g ] ● in₂ ≈ g
-commute-in₂ {Γ₁} {Γ₂} {Δ} {f} {g} =
-  η-≡ {f₁ = [ f , g ] ● in₂}
-      {f₂ = g}
-      (λ a → η-≡ {f₁ = ([ f , g ] ● in₂) a}
-                 {f₂ = g a}
-                 (commute-in₂-arg {f = f} {g = g} a)
-      )
+commute-in₂ : (Γ₁ : Ctx) → (Γ₂ : Ctx) → {Δ : Ctx} {f : Γ₁ ▹ Δ} {g : Γ₂ ▹ Δ}
+              → ([ f , g ] ● in₂) ≡C g
+commute-in₂ Γ₁ Γ₂ {Δ} {f} {g} =
+  record { ≡C-proof = λ {a} {x} → commute-in₂-arg {f = f} {g} a x }
 
 open import Categories.Object.Coproduct ctx-cat
 
@@ -304,14 +343,16 @@ ctx-coproduct {Γ₁} {Γ₂} = record
                   ; i₁ = in₁
                   ; i₂ = in₂
                   ; [_,_] = [_,_]
-                  ; commute₁ = commute-in₁
-                  ; commute₂ = commute-in₂
+                  ; commute₁ = commute-in₁ Γ₁ Γ₂
+                  ; commute₂ = commute-in₂ Γ₁ Γ₂
                   ; universal = ⊕-is-coprod₁
                   }
 
 open import Categories.Object.BinaryCoproducts ctx-cat
 
-ctx-bin-coproducts : ∀{Γ₁ Γ₂ : Ctx} → BinaryCoproducts
+ctx-bin-coproducts : BinaryCoproducts
 ctx-bin-coproducts = record { coproduct = ctx-coproduct }
 
 open BinaryCoproducts ctx-bin-coproducts
+
+-}

@@ -96,3 +96,6 @@ funkyDefs = fromList [
 -- But reduce can detect this now in the fly.
 funky1 :: Term
 funky1 = out funky
+
+f2 :: Term
+f2 = prj R (Sym "f" $ Prod nat $ stream nat)

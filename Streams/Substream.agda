@@ -6,52 +6,60 @@ open import Data.Product
 open import Function.Equivalence
 
 mutual
-  record W : Set where
+  record F : Set where
     coinductive
-    field out : Wμ
+    field out : Fμ
 
-  data Wμ : Set where
-    pres : W → Wμ
-    drop : Wμ → Wμ
+  data Fμ : Set where
+    pres : F → Fμ
+    drop : Fμ → Fμ
 
-open W public
+open F public
 
-comp : W → W → W
-xcomp : Wμ → Wμ → Wμ
+μfilter : ∀{A} → Fμ → Stream A → Stream A
+filter : ∀{A} → F → Stream A → Stream A
 
-out (comp x y) = xcomp (out x) (out y)
+filter x = μfilter (out x)
 
-xcomp (pres x') (pres y') = pres (comp  x' y')
-xcomp (drop u') (pres y') = drop (xcomp u' (out y'))
-xcomp u      (drop v') = drop (xcomp u v')
+hd (μfilter (pres x) s) = hd s
+tl (μfilter (pres x) s) = filter x (tl s)
+μfilter (drop u) s = μfilter u (tl s)
 
-xfilter : ∀{A} → Wμ → Stream A → Stream A
+comp : F → F → F
+μcomp : Fμ → Fμ → Fμ
 
-filter : ∀{A} → W → Stream A → Stream A
-filter x = xfilter (out x)
+out (comp x y) = μcomp (out x) (out y)
 
-hd (xfilter (pres x) s) = hd s
-tl (xfilter (pres x) s) = filter x (tl s)
-xfilter (drop u) s = xfilter u (tl s)
+μcomp (pres x) (pres y) = pres (comp x y)
+μcomp (pres x) (drop v) = drop (μcomp (out x) v)
+μcomp (drop u) v        = drop (μcomp u v)
+
+_•_ : F → F → F
+y • x = comp x y
+
+_•μ_ : Fμ → Fμ → Fμ
+v •μ u = μcomp u v
 
 filter-comp : ∀{A} → ∀ x y (s : Stream A) →
-              filter (comp x y) s ~ filter x (filter y s)
-xfilter-comp : ∀{A} → ∀ u v (s : Stream A) →
-               xfilter (xcomp u v) s ~ xfilter u (xfilter v s)
+              filter (y • x) s ~ filter y (filter x s)
+μfilter-comp : ∀{A} → ∀ u v (s : Stream A) →
+               μfilter (v •μ u) s ~ μfilter v (μfilter u s)
 
-filter-comp x y s = xfilter-comp (out x) (out y) s
+filter-comp x y s = μfilter-comp (out x) (out y) s
 
-hd~(xfilter-comp (pres x') (pres y') s) = refl
-tl~(xfilter-comp (pres x') (pres y') s) = filter-comp x' y' (tl s)
-xfilter-comp (drop u') (pres y') s = xfilter-comp u' (out y') (tl s)
-xfilter-comp (pres x') (drop v') s = xfilter-comp (pres x') v' (tl s)
-xfilter-comp (drop u') (drop v') s = xfilter-comp (drop u') v' (tl s)
+hd~(μfilter-comp (pres x) (pres y) s) = refl
+tl~(μfilter-comp (pres x) (pres y) s) = filter-comp x y (tl s)
+μfilter-comp (pres x) (drop v) s = μfilter-comp (out x) v (tl s)
+-- The following cases are just the same, they need to be there for Agda to
+-- reduce the definition of μcomp
+μfilter-comp (drop u) (pres x) s = μfilter-comp u (pres x) (tl s)
+μfilter-comp (drop u) (drop v) s = μfilter-comp u (drop v) (tl s)
 
-_≤[_]_ : ∀{A} → Stream A → W → Stream A → Set
+_≤[_]_ : ∀{A} → Stream A → F → Stream A → Set
 s ≤[ x ] t = s ~ filter x t
 
-_≤μ[_]_ : ∀{A} → Stream A → Wμ → Stream A → Set
-s ≤μ[ x ] t = s ~ xfilter x t
+_≤μ[_]_ : ∀{A} → Stream A → Fμ → Stream A → Set
+s ≤μ[ x ] t = s ~ μfilter x t
 
 
 mutual
@@ -65,8 +73,8 @@ mutual
 
 open _≤_ public
 
-witness : ∀{A} {s t : Stream A} → s ≤ t → W
-xwitness : ∀{A} {s t : Stream A} → s ≤μ t → Wμ
+witness : ∀{A} {s t : Stream A} → s ≤ t → F
+xwitness : ∀{A} {s t : Stream A} → s ≤μ t → Fμ
 
 out (witness p) = xwitness (out≤ p)
 
@@ -82,8 +90,8 @@ hd~ (ximpl₁ (ma h≡ t≤)) = h≡
 tl~ (ximpl₁ (ma h≡ t≤)) = impl₁ t≤
 ximpl₁ (sk q) = ximpl₁ q
 
-impl₂ : ∀{A} {s t : Stream A} (x : W) → s ≤[ x ] t → s ≤ t
-ximpl₂ : ∀{A} {s t : Stream A} (u : Wμ) → s ≤μ[ u ] t → s ≤μ t
+impl₂ : ∀{A} {s t : Stream A} (x : F) → s ≤[ x ] t → s ≤ t
+ximpl₂ : ∀{A} {s t : Stream A} (u : Fμ) → s ≤μ[ u ] t → s ≤μ t
 
 out≤ (impl₂ x p) = ximpl₂ (out x) p
 
@@ -95,15 +103,15 @@ ximpl₂ (drop u) p = sk (ximpl₂ u p)
 ≤⇔filter-≤ s t = equivalence (λ x → witness x , impl₁ x)
                              (λ {(x , p) → impl₂ x p})
 
-filter-resp~ : ∀{A} {s t : Stream A} (x : W) →
+filter-resp~ : ∀{A} {s t : Stream A} (x : F) →
                s ~ t → filter x s ~ filter x t
-xfilter-resp~ : ∀{A} {s t : Stream A} (u : Wμ) →
-                s ~ t → xfilter u s ~ xfilter u t
+μfilter-resp~ : ∀{A} {s t : Stream A} (u : Fμ) →
+                s ~ t → μfilter u s ~ μfilter u t
 
-filter-resp~ x p = xfilter-resp~ (out x) p
-hd~ (xfilter-resp~ (pres x) p) = hd~ p
-tl~ (xfilter-resp~ (pres x) p) = filter-resp~ x (tl~ p)
-xfilter-resp~ (drop u) p = xfilter-resp~ u (tl~ p)
+filter-resp~ x p = μfilter-resp~ (out x) p
+hd~ (μfilter-resp~ (pres x) p) = hd~ p
+tl~ (μfilter-resp~ (pres x) p) = filter-resp~ x (tl~ p)
+μfilter-resp~ (drop u) p = μfilter-resp~ u (tl~ p)
 
 
 {-
@@ -114,15 +122,65 @@ r ~ filter x s
 
 -}
 ≤-filter-trans : ∀{A} {r s t : Stream A} {x y} →
-                 r ≤[ x ] s → s ≤[ y ] t → r ≤[ comp x y ] t
+                 r ≤[ x ] s → s ≤[ y ] t → r ≤[ x • y ] t
 ≤-filter-trans {x = x} {y} p q =
   ~trans p (
     ~trans (filter-resp~ x q)
-           (~sym (filter-comp x y _)))
+           (~sym (filter-comp y x _)))
 
 ≤-trans : ∀{A} {r s t : Stream A} →
           r ≤ s → s ≤ t → r ≤ t
-≤-trans p q =
-  impl₂ (comp (witness p) (witness q))
-        (≤-filter-trans {x = (witness p)} {y = (witness q)}
-                        (impl₁ p) (impl₁ q))
+≤-trans p q = impl₂ (witness p • witness q)
+                    (≤-filter-trans {x = witness p}
+                                    {y = witness q}
+                                    (impl₁ p)
+                                    (impl₁ q)
+                    )
+
+-- lem : ∀{A} {s t : Stream A} → hd s ≡ hd t → tl s ≤ tl t → t ≤μ tl s → tl t ≤μ tl s
+-- lem s0≡t0 t'≤s' (ma t0≡s1 t'≤s'') with out≤ t'≤s'
+-- lem s0≡t0 t'≤s' (ma t0≡s1 t'≤s'') | ma s1≡t1 s''≤t'' = ma (P.sym s1≡t1) {!!}
+-- lem s0≡t0 t'≤s' (ma t0≡s1 t'≤s'') | sk p = {!!}
+-- lem {s = s} s0≡t0 s'≤t' (sk p) = {!!}
+
+-- ≤-antisym : ∀{A} {s t : Stream A} →
+--             s ≤ t → t ≤ s → s ~ t
+-- ≤μ-antisym : ∀{A} {s t : Stream A} →
+--             s ≤μ t → t ≤μ s → s ~ t
+-- ≤-antisym p q = ≤μ-antisym (out≤ p) (out≤ q)
+-- hd~ (≤μ-antisym (ma hs≡ht ts≤tt) _) = hs≡ht
+-- tl~ (≤μ-antisym (ma hs≡ht ts≤tt) (ma ht≡hs tt≤ts)) = ≤-antisym ts≤tt tt≤ts
+-- tl~ (≤μ-antisym (ma hs≡ht ts≤tt) (sk q)) = ≤μ-antisym (out≤ ts≤tt) {!!}
+-- ≤μ-antisym (sk p) q = {!!}
+
+
+{-
+------------------
+--- Try to convince Agda that x = zip(ev(x), odd(x)) is well-defined.
+
+even : ∀{A} → Stream A → Stream A
+hd (even s) = hd s
+tl (even s) = even (tl (tl s))
+
+odd : ∀{A} → Stream A → Stream A
+odd s = even (tl s)
+
+zips : ∀{A} → Stream A → Stream A → Stream A
+hd (zips s t) = hd s
+tl (zips s t) = zips t (tl s)
+
+open import Data.Nat
+
+foo : Stream ℕ
+hd foo = 0
+tl foo = zips (even foo) (odd foo)
+
+-- H : Stream ℕ → Stream ℕ → Stream ℕ
+-- f : ℕ → Stream ℕ → Stream ℕ → Stream ℕ
+
+-- H s t = f (hd t) s t
+
+-- hd (f zero s t) = hd s
+-- tl (f zero s t) = H s (tl t)
+-- f (suc n) s t = f n (tl s) t
+-}
