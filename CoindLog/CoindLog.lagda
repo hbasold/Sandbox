@@ -11,7 +11,11 @@ open import Data.Nat.Properties
 open import Data.Unit hiding (_≤_)
 open import Data.Product
 open import Function
+\end{code}
 
+In the following, we define relations of arbitrary arity.
+These subsume sets (0-ary relations) and predicates (1-ary relations).
+\begin{code}
 Arity : Set₁
 Arity = List Set
 
@@ -27,7 +31,22 @@ _⊆_ {X ∷ ar} R S = ∀ (x : X) → R x ⊆ S x
           R ⊆ S → S ⊆ T → R ⊆ T
 ⊆-trans {[]}     p q = q ∘ p
 ⊆-trans {X ∷ ar} p q = λ x → ⊆-trans {ar} (p x) (q x)
+\end{code}
 
+Full relation
+\begin{code}
+Top : {ar : Arity} → Rel ar
+Top {[]} = ⊤
+Top {X ∷ ar} x = Top {ar}
+
+Top! : {ar : Arity} → (R : Rel ar) → R ⊆ Top
+Top! {[]} R = λ x → tt
+Top! {X ∷ ar} R = λ x → Top! (R x)
+\end{code}
+
+Next, we introduce relation transformer, which are monotone functions on
+the lattice of relations.
+\begin{code}
 RelT₀ : (ar : Arity) → Set₁
 RelT₀ ar = Rel ar → Rel ar
 
@@ -45,14 +64,20 @@ _⊚_ : {ar : Arity} → RelT ar → RelT ar → RelT ar
   where
     mono : (R S : Rel _) → R ⊆ S → G (F R) ⊆ G (F S)
     mono R S p = monoG (F R) (F S) (monoF R S p)
+\end{code}
 
+Compatible up-to techniques
+\begin{code}
 record CompatUpTo {ar : Arity} (Φ : RelT ar) : Set₁ where
   constructor compatUpTo
   field
     tech    : RelT ar
     compat  : (tech ⊚ Φ) ⊑ (Φ ⊚ tech)
   open RelT tech public
+\end{code}
 
+Terms are elements that can occur in relations
+\begin{code}
 Terms : Arity → Set
 Terms [] = ⊤
 Terms (X ∷ Xs) = X × Terms Xs
@@ -65,21 +90,13 @@ _∈'_ {X ∷ ar} (t , ts) R = ts ∈' R t
 ∈-mono {[]}    R S ts       p q = p q
 ∈-mono {x ∷ ar} R S (t , ts) p q = ∈-mono (R t) (S t) ts (p t) q
 
--- Rel₂ : Set → Set → Set₁
--- Rel₂ A B = Rel (A ∷ [ B ])
-
-Top : {ar : Arity} → Rel ar
-Top {[]} = ⊤
-Top {X ∷ ar} x = Top {ar}
-
-Top! : {ar : Arity} → (R : Rel ar) → R ⊆ Top
-Top! {[]} R = λ x → tt
-Top! {X ∷ ar} R = λ x → Top! (R x)
-
 Top-∈ : {ar : Arity} → (ts : Terms ar) → ts ∈' Top
 Top-∈ {[]}    _        = tt
 Top-∈ {x ∷ ar} (t , ts) = Top-∈ ts
+\end{code}
 
+Indexed relations
+\begin{code}
 IRel₀ : Arity → Set₁
 IRel₀ ar = ℕ → Rel ar
 
@@ -100,7 +117,10 @@ LiftT {ar} (relT Φ mono) (iRel R decR) = iRel ΦR dec
 
     dec : (n m : ℕ) → m ≤ n → ΦR n ⊆ ΦR m
     dec n m p = mono (R n) (R m) (decR n m p)
+\end{code}
 
+Indexed predicates
+\begin{code}
 IPred₀ : Set₁
 IPred₀ = ℕ → Set
 
@@ -133,7 +153,10 @@ _⟶_ : IPred → IPred → Set
 
 ≼→∈ : {ar : Arity} {R S : IRel ar} → R ≼ S → ∀ ts → (ts ∈ R) ⟶ (ts ∈ S)
 ≼→∈ p ts n q = ∈-mono _ _ ts (p n) q
+\end{code}
 
+Later modality for indexed predicates
+\begin{code}
 ▶ : IPred → IPred
 ▶ (iPred φ decφ) = iPred ▶φ dec
   where
@@ -145,11 +168,6 @@ _⟶_ : IPred → IPred → Set
     dec n        .0        z≤n      p = tt
     dec .(suc _) .(suc _) (s≤s m≤n) p = decφ _ _ m≤n p
 
-löb : {φ : IPred} → (▶ φ ⇒ φ) ⟶ φ
-löb     zero     p = p zero z≤n tt
-löb {φ} (suc n)  p =
-  p (suc n) ≤-refl (löb {φ} n (λ m m≤n ▶φm → p m (≤-step m≤n) ▶φm))
-
 next : {φ : IPred} → φ ⟶ ▶ φ
 next                zero    p = tt
 next {iPred φ decφ} (suc n) p = decφ (1 + n) n (n≤1+n n) p
@@ -157,10 +175,24 @@ next {iPred φ decφ} (suc n) p = decφ (1 + n) n (n≤1+n n) p
 mon : {φ ψ : IPred} → (φ ⟶ ψ) → (▶ φ ⟶ ▶ ψ)
 mon p zero    q = tt
 mon p (suc n) q = p n q
+\end{code}
 
+Löb induction
+\begin{code}
+löb : {φ : IPred} → (▶ φ ⇒ φ) ⟶ φ
+löb     zero     p = p zero z≤n tt
+löb {φ} (suc n)  p =
+  p (suc n) ≤-refl (löb {φ} n (λ m m≤n ▶φm → p m (≤-step m≤n) ▶φm))
+\end{code}
+
+\begin{code}
 module ChainReasoning {ar : Arity} (T : RelT ar) where
   open RelT T renaming (trans to Φ; mono to monoΦ)
 
+  \end{code}
+
+  Final chain for a monotone operator and the associated
+  \begin{code}
   Seq₀ : IRel₀ ar
   Seq₀ zero = Top
   Seq₀ (suc n) = Φ (Seq₀ n)
@@ -171,11 +203,20 @@ module ChainReasoning {ar : Arity} (T : RelT ar) where
       dec : (n m : ℕ) → m ≤ n → Seq₀ n ⊆ Seq₀ m
       dec n        .0        z≤n     = Top! (Seq₀ n)
       dec (suc n)  (suc m)  (s≤s p)  = monoΦ (Seq₀ n) (Seq₀ m) (dec _ _ p)
+\end{code}
 
+Unfolding of the operator on the sequence.
+This will allow us to do recursion steps with the Löb rule.
+\begin{code}
   seq : (ts : Terms ar) → ▶ (ts ∈ LiftT T Seq) ⟶ (ts ∈ Seq)
   seq ts zero    p = Top-∈ ts
   seq ts (suc n) p = p
+\end{code}
 
+Compatible up-to techniques give us inclusions on every step of the
+sequence.
+This will allow us to import them into recursive proofs.
+\begin{code}
   compat-seq : (F : CompatUpTo T) → (LiftT (CompatUpTo.tech F) Seq) ≼ Seq
   compat-seq F zero = Top! (CompatUpTo.trans F Top)
   compat-seq F (suc n) =
@@ -189,12 +230,11 @@ module ChainReasoning {ar : Arity} (T : RelT ar) where
              (ts ∈ LiftT (CompatUpTo.tech F) Seq) ⟶ (ts ∈ Seq)
   compat-∈ F ts n p =
     ≼→∈ {ar} {LiftT (CompatUpTo.tech F) Seq} {Seq} (compat-seq F) ts n p
-
--- TODO:
--- * Extend up-to techniques to transformations of arbitrary arity;
---   this is needed, for instance, for transitivity
--- * Example 1: Bisimilarity for streams + proof that ⊕ is commutative
--- * Example 2: Selection is homomorphism
--- * Example 3: Observational equivalence (do we need indexed relations?)
-
 \end{code}
+
+TODO:
+* Extend up-to techniques to transformations of arbitrary arity;
+  this is needed, for instance, for transitivity
+* Example 1: Bisimilarity for streams + proof that ⊕ is commutative
+* Example 2: Selection is homomorphism
+* Example 3: Observational equivalence (do we need indexed relations?)
