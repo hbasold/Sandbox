@@ -5,64 +5,92 @@ open import Data.Nat hiding (pred)
 open import Data.Nat.Properties
 open import Data.Unit hiding (_≤_)
 open import Data.Product
+open import Function
 
-Rel : List Set → Set₁
+Arity : Set₁
+Arity = List Set
+
+Rel : Arity → Set₁
 Rel [] = Set
 Rel (X ∷ Xs) = X → Rel Xs
 
-_⊆_ : {L : List Set} → Rel L → Rel L → Set
+_⊆_ : {ar : Arity} → Rel ar → Rel ar → Set
 _⊆_ {[]} R S = R → S
-_⊆_ {X ∷ L} R S = ∀ (x : X) → R x ⊆ S x
+_⊆_ {X ∷ ar} R S = ∀ (x : X) → R x ⊆ S x
 
-RelT₀ : (L : List Set) → Set₁
-RelT₀ L = Rel L → Rel L
+⊆-trans : {ar : Arity} {R S T : Rel ar} →
+          R ⊆ S → S ⊆ T → R ⊆ T
+⊆-trans {[]}     p q = q ∘ p
+⊆-trans {X ∷ ar} p q = λ x → ⊆-trans {ar} (p x) (q x)
 
-record RelT (L : List Set) : Set₁ where
+RelT₀ : (ar : Arity) → Set₁
+RelT₀ ar = Rel ar → Rel ar
+
+record RelT (ar : Arity) : Set₁ where
   constructor relT
   field
-    trans  : RelT₀ L
+    trans  : RelT₀ ar
     mono   : ∀ R S → R ⊆ S → trans R ⊆ trans S
 
-Terms : List Set → Set
+_⊑_ : {ar : Arity} → RelT ar → RelT ar → Set₁
+(relT F _) ⊑ (relT G _) = ∀ R → F R ⊆ G R
+
+_⊚_ : {ar : Arity} → RelT ar → RelT ar → RelT ar
+(relT G monoG) ⊚ (relT F monoF) = relT (G ∘ F) mono
+  where
+    mono : (R S : Rel _) → R ⊆ S → G (F R) ⊆ G (F S)
+    mono R S p = monoG (F R) (F S) (monoF R S p)
+
+record CompatUpTo {ar : Arity} (Φ : RelT ar) : Set₁ where
+  constructor compatUpTo
+  field
+    tech    : RelT ar
+    compat  : (tech ⊚ Φ) ⊑ (Φ ⊚ tech)
+  open RelT tech public
+
+Terms : Arity → Set
 Terms [] = ⊤
 Terms (X ∷ Xs) = X × Terms Xs
 
-_∈'_ : {L : List Set} → Terms L → Rel L → Set
+_∈'_ : {ar : Arity} → Terms ar → Rel ar → Set
 _∈'_ {[]} ts R = R
-_∈'_ {X ∷ L} (t , ts) R = ts ∈' R t
+_∈'_ {X ∷ ar} (t , ts) R = ts ∈' R t
 
-∈-mono : {L : List Set} (R S : Rel L) (ts : Terms L) → R ⊆ S → ts ∈' R → ts ∈' S
+∈-mono : {ar : Arity} (R S : Rel ar) (ts : Terms ar) → R ⊆ S → ts ∈' R → ts ∈' S
 ∈-mono {[]}    R S ts       p q = p q
-∈-mono {x ∷ L} R S (t , ts) p q = ∈-mono (R t) (S t) ts (p t) q
+∈-mono {x ∷ ar} R S (t , ts) p q = ∈-mono (R t) (S t) ts (p t) q
 
 -- Rel₂ : Set → Set → Set₁
 -- Rel₂ A B = Rel (A ∷ [ B ])
 
-Top : {L : List Set} → Rel L
+Top : {ar : Arity} → Rel ar
 Top {[]} = ⊤
-Top {X ∷ L} x = Top {L}
+Top {X ∷ ar} x = Top {ar}
 
-Top! : {L : List Set} → (R : Rel L) → R ⊆ Top
+Top! : {ar : Arity} → (R : Rel ar) → R ⊆ Top
 Top! {[]} R = λ x → tt
-Top! {X ∷ L} R = λ x → Top! (R x)
+Top! {X ∷ ar} R = λ x → Top! (R x)
 
-Top-∈ : {L : List Set} → (ts : Terms L) → ts ∈' Top
+Top-∈ : {ar : Arity} → (ts : Terms ar) → ts ∈' Top
 Top-∈ {[]}    _        = tt
-Top-∈ {x ∷ L} (t , ts) = Top-∈ ts
+Top-∈ {x ∷ ar} (t , ts) = Top-∈ ts
 
-IRel₀ : List Set → Set₁
-IRel₀ L = ℕ → Rel L
+IRel₀ : Arity → Set₁
+IRel₀ ar = ℕ → Rel ar
 
-record IRel (L : List Set) : Set₁ where
+record IRel (ar : Arity) : Set₁ where
   constructor iRel
   field
-    rel : IRel₀ L
+    rel : IRel₀ ar
     dec : ∀ n m → m ≤ n → rel n ⊆ rel m
 
-LiftT : {L : List Set} → RelT L → IRel L → IRel L
-LiftT {L} (relT Φ mono) (iRel R decR) = iRel ΦR dec
+_≼_ : {ar : Arity} → IRel ar → IRel ar → Set
+(iRel R _) ≼ (iRel S _) = ∀ n → R n ⊆ S n
+
+LiftT : {ar : Arity} → RelT ar → IRel ar → IRel ar
+LiftT {ar} (relT Φ mono) (iRel R decR) = iRel ΦR dec
   where
-    ΦR : IRel₀ L
+    ΦR : IRel₀ ar
     ΦR n = Φ (R n)
 
     dec : (n m : ℕ) → m ≤ n → ΦR n ⊆ ΦR m
@@ -77,21 +105,10 @@ record IPred : Set₁ where
     pred : IPred₀
     dec : ∀ n m → m ≤ n → pred n → pred m
 
-Seq₀ : {L : List Set} → RelT₀ L → IRel₀ L
-Seq₀ Φ zero = Top
-Seq₀ Φ (suc n) = Φ (Seq₀ Φ n)
-
-Seq : {L : List Set} → RelT L → IRel L
-Seq (relT Φ mono) = iRel (Seq₀ Φ) dec
-  where
-    dec : (n m : ℕ) → m ≤ n → Seq₀ Φ n ⊆ Seq₀ Φ m
-    dec n        .0        z≤n     = Top! (Seq₀ Φ n)
-    dec (suc n)  (suc m)  (s≤s p)  = mono (Seq₀ _ n) (Seq₀ _ m) (dec _ _ p)
-
-_∈₀_ : {L : List Set} → Terms L → IRel₀ L → IPred₀
+_∈₀_ : {ar : Arity} → Terms ar → IRel₀ ar → IPred₀
 (ts ∈₀ R) n = ts ∈' R n
 
-_∈_ : {L : List Set} → Terms L → IRel L → IPred
+_∈_ : {ar : Arity} → Terms ar → IRel ar → IPred
 ts ∈ (iRel R decR) = iPred (ts ∈₀ R) dec
   where
     dec : (n m : ℕ) → m ≤ n → ts ∈' R n → ts ∈' R m
@@ -108,6 +125,9 @@ _⇒_ : IPred → IPred → IPred
 
 _⟶_ : IPred → IPred → Set
 (iPred φ _) ⟶ (iPred ψ _) = ∀ n → φ n → ψ n
+
+≼→∈ : {ar : Arity} {R S : IRel ar} → R ≼ S → ∀ ts → (ts ∈ R) ⟶ (ts ∈ S)
+≼→∈ p ts n q = ∈-mono _ _ ts (p n) q
 
 ▶ : IPred → IPred
 ▶ (iPred φ decφ) = iPred ▶φ dec
@@ -133,13 +153,41 @@ mon : {φ ψ : IPred} → (φ ⟶ ψ) → (▶ φ ⟶ ▶ ψ)
 mon p zero    q = tt
 mon p (suc n) q = p n q
 
-seq : {L : List Set} {T : RelT L} (ts : Terms L) →
-      ▶ (ts ∈ LiftT T (Seq T)) ⟶ (ts ∈ Seq T)
-seq ts zero    p = Top-∈ ts
-seq ts (suc n) p = p
+module ChainReasoning {ar : Arity} (T : RelT ar) where
+  open RelT T renaming (trans to Φ; mono to monoΦ)
+
+  Seq₀ : IRel₀ ar
+  Seq₀ zero = Top
+  Seq₀ (suc n) = Φ (Seq₀ n)
+
+  Seq : IRel ar
+  Seq = iRel Seq₀ dec
+    where
+      dec : (n m : ℕ) → m ≤ n → Seq₀ n ⊆ Seq₀ m
+      dec n        .0        z≤n     = Top! (Seq₀ n)
+      dec (suc n)  (suc m)  (s≤s p)  = monoΦ (Seq₀ n) (Seq₀ m) (dec _ _ p)
+
+  seq : (ts : Terms ar) → ▶ (ts ∈ LiftT T Seq) ⟶ (ts ∈ Seq)
+  seq ts zero    p = Top-∈ ts
+  seq ts (suc n) p = p
+
+  compat-seq : (F : CompatUpTo T) → (LiftT (CompatUpTo.tech F) Seq) ≼ Seq
+  compat-seq F zero = Top! (CompatUpTo.trans F Top)
+  compat-seq F (suc n) =
+    ⊆-trans {ar}
+            (compat (Seq₀ n))
+            (monoΦ (LiftT tech Seq .IRel.rel n) (Seq₀ n) (compat-seq F n))
+    where
+      open CompatUpTo F renaming (trans to Ψ)
+
+  compat-∈ : (F : CompatUpTo T) (ts : Terms ar) →
+             (ts ∈ LiftT (CompatUpTo.tech F) Seq) ⟶ (ts ∈ Seq)
+  compat-∈ F ts n p =
+    ≼→∈ {ar} {LiftT (CompatUpTo.tech F) Seq} {Seq} (compat-seq F) ts n p
 
 -- TODO:
--- * Prove correctness for compatible up-to techniques
+-- * Extend up-to techniques to transformations of arbitrary arity;
+--   this is needed, for instance, for transitivity
 -- * Example 1: Bisimilarity for streams + proof that ⊕ is commutative
 -- * Example 2: Selection is homomorphism
 -- * Example 3: Observational equivalence (do we need indexed relations?)
