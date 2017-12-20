@@ -1,3 +1,8 @@
+\begin{code}
+{-# OPTIONS --without-K #-}
+\end{code}
+
+\begin{code}
 module CoindLog where
 
 open import Data.List
@@ -191,3 +196,5 @@ module ChainReasoning {ar : Arity} (T : RelT ar) where
 -- * Example 1: Bisimilarity for streams + proof that ⊕ is commutative
 -- * Example 2: Selection is homomorphism
 -- * Example 3: Observational equivalence (do we need indexed relations?)
+
+\end{code}
