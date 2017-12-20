@@ -20,28 +20,27 @@ Arity : Set₁
 Arity = List Set
 
 Rel : Arity → Set₁
-Rel [] = Set
-Rel (X ∷ Xs) = X → Rel Xs
+Rel []        = Set
+Rel (X ∷ Xs)  = X → Rel Xs
 
 _⊆_ : {ar : Arity} → Rel ar → Rel ar → Set
-_⊆_ {[]} R S = R → S
-_⊆_ {X ∷ ar} R S = ∀ (x : X) → R x ⊆ S x
+_⊆_ {[]}      R S = R → S
+_⊆_ {X ∷ ar}  R S = ∀ (x : X) → R x ⊆ S x
 
-⊆-trans : {ar : Arity} {R S T : Rel ar} →
-          R ⊆ S → S ⊆ T → R ⊆ T
-⊆-trans {[]}     p q = q ∘ p
-⊆-trans {X ∷ ar} p q = λ x → ⊆-trans {ar} (p x) (q x)
+⊆-trans : {ar : Arity} {R S T : Rel ar} → R ⊆ S → S ⊆ T → R ⊆ T
+⊆-trans {[]}      p q = q ∘ p
+⊆-trans {X ∷ ar}  p q = λ x → ⊆-trans {ar} (p x) (q x)
 \end{code}
 
 Full relation
 \begin{code}
 Top : {ar : Arity} → Rel ar
-Top {[]} = ⊤
-Top {X ∷ ar} x = Top {ar}
+Top {[]}        = ⊤
+Top {X ∷ ar} x  = Top {ar}
 
 Top! : {ar : Arity} → (R : Rel ar) → R ⊆ Top
-Top! {[]} R = λ x → tt
-Top! {X ∷ ar} R = λ x → Top! (R x)
+Top! {[]}      R = λ x → tt
+Top! {X ∷ ar}  R = λ x → Top! (R x)
 \end{code}
 
 Next, we introduce relation transformer, which are monotone functions on
@@ -83,16 +82,16 @@ Terms [] = ⊤
 Terms (X ∷ Xs) = X × Terms Xs
 
 _∈'_ : {ar : Arity} → Terms ar → Rel ar → Set
-_∈'_ {[]} ts R = R
-_∈'_ {X ∷ ar} (t , ts) R = ts ∈' R t
+_∈'_ {[]}     ts        R = R
+_∈'_ {X ∷ ar} (t , ts)  R = ts ∈' R t
 
-∈-mono : {ar : Arity} (R S : Rel ar) (ts : Terms ar) → R ⊆ S → ts ∈' R → ts ∈' S
-∈-mono {[]}    R S ts       p q = p q
-∈-mono {x ∷ ar} R S (t , ts) p q = ∈-mono (R t) (S t) ts (p t) q
+∈-mono : {ar : Arity} {R S : Rel ar} → R ⊆ S → ∀ ts → ts ∈' R → ts ∈' S
+∈-mono {[]}      p ts        q = p q
+∈-mono {x ∷ ar}  p (t , ts)  q = ∈-mono (p t) ts q
 
 Top-∈ : {ar : Arity} → (ts : Terms ar) → ts ∈' Top
-Top-∈ {[]}    _        = tt
-Top-∈ {x ∷ ar} (t , ts) = Top-∈ ts
+Top-∈ {[]}     _         = tt
+Top-∈ {x ∷ ar} (t , ts)  = Top-∈ ts
 \end{code}
 
 Indexed relations
@@ -103,8 +102,8 @@ IRel₀ ar = ℕ → Rel ar
 record IRel (ar : Arity) : Set₁ where
   constructor iRel
   field
-    rel : IRel₀ ar
-    dec : ∀ n m → m ≤ n → rel n ⊆ rel m
+    rel  : IRel₀ ar
+    dec  : ∀ n m → m ≤ n → rel n ⊆ rel m
 
 _≼_ : {ar : Arity} → IRel ar → IRel ar → Set
 (iRel R _) ≼ (iRel S _) = ∀ n → R n ⊆ S n
@@ -127,8 +126,8 @@ IPred₀ = ℕ → Set
 record IPred : Set₁ where
   constructor iPred
   field
-    pred : IPred₀
-    dec : ∀ n m → m ≤ n → pred n → pred m
+    pred  : IPred₀
+    dec   : ∀ n m → m ≤ n → pred n → pred m
 
 _∈₀_ : {ar : Arity} → Terms ar → IRel₀ ar → IPred₀
 (ts ∈₀ R) n = ts ∈' R n
@@ -137,7 +136,7 @@ _∈_ : {ar : Arity} → Terms ar → IRel ar → IPred
 ts ∈ (iRel R decR) = iPred (ts ∈₀ R) dec
   where
     dec : (n m : ℕ) → m ≤ n → ts ∈' R n → ts ∈' R m
-    dec n m m≤n p = ∈-mono (R n) (R m) ts (decR n m m≤n) p
+    dec n m m≤n p = ∈-mono (decR n m m≤n) ts p
 
 _⇒₀_ : IPred₀ → IPred₀ → IPred₀
 (φ ⇒₀ ψ) n = ∀ m → m ≤ n → φ m → ψ m
@@ -152,7 +151,7 @@ _⟶_ : IPred → IPred → Set
 (iPred φ _) ⟶ (iPred ψ _) = ∀ n → φ n → ψ n
 
 ≼→∈ : {ar : Arity} {R S : IRel ar} → R ≼ S → ∀ ts → (ts ∈ R) ⟶ (ts ∈ S)
-≼→∈ p ts n q = ∈-mono _ _ ts (p n) q
+≼→∈ p ts n q = ∈-mono (p n) ts q
 \end{code}
 
 Later modality for indexed predicates
@@ -161,27 +160,27 @@ Later modality for indexed predicates
 ▶ (iPred φ decφ) = iPred ▶φ dec
   where
     ▶φ : IPred₀
-    ▶φ zero = ⊤
-    ▶φ (suc n) = φ n
+    ▶φ zero     = ⊤
+    ▶φ (suc n)  = φ n
 
     dec : (n m : ℕ) → m ≤ n → ▶φ n → ▶φ m
-    dec n        .0        z≤n      p = tt
-    dec .(suc _) .(suc _) (s≤s m≤n) p = decφ _ _ m≤n p
+    dec n         .0        z≤n        p = tt
+    dec .(suc _)  .(suc _)  (s≤s m≤n)  p = decφ _ _ m≤n p
 
 next : {φ : IPred} → φ ⟶ ▶ φ
-next                zero    p = tt
-next {iPred φ decφ} (suc n) p = decφ (1 + n) n (n≤1+n n) p
+next                 zero     p = tt
+next {iPred φ decφ}  (suc n)  p = decφ (1 + n) n (n≤1+n n) p
 
 mon : {φ ψ : IPred} → (φ ⟶ ψ) → (▶ φ ⟶ ▶ ψ)
-mon p zero    q = tt
-mon p (suc n) q = p n q
+mon p zero     q = tt
+mon p (suc n)  q = p n q
 \end{code}
 
 Löb induction
 \begin{code}
 löb : {φ : IPred} → (▶ φ ⇒ φ) ⟶ φ
-löb     zero     p = p zero z≤n tt
-löb {φ} (suc n)  p =
+löb      zero     p = p zero z≤n tt
+löb {φ}  (suc n)  p =
   p (suc n) ≤-refl (löb {φ} n (λ m m≤n ▶φm → p m (≤-step m≤n) ▶φm))
 \end{code}
 
@@ -194,8 +193,8 @@ module ChainReasoning {ar : Arity} (T : RelT ar) where
   Final chain for a monotone operator and the associated
   \begin{code}
   Seq₀ : IRel₀ ar
-  Seq₀ zero = Top
-  Seq₀ (suc n) = Φ (Seq₀ n)
+  Seq₀ zero     = Top
+  Seq₀ (suc n)  = Φ (Seq₀ n)
 
   Seq : IRel ar
   Seq = iRel Seq₀ dec
@@ -209,8 +208,8 @@ Unfolding of the operator on the sequence.
 This will allow us to do recursion steps with the Löb rule.
 \begin{code}
   seq : (ts : Terms ar) → ▶ (ts ∈ LiftT T Seq) ⟶ (ts ∈ Seq)
-  seq ts zero    p = Top-∈ ts
-  seq ts (suc n) p = p
+  seq ts zero     p = Top-∈ ts
+  seq ts (suc n)  p = p
 \end{code}
 
 Compatible up-to techniques give us inclusions on every step of the
@@ -218,8 +217,8 @@ sequence.
 This will allow us to import them into recursive proofs.
 \begin{code}
   compat-seq : (F : CompatUpTo T) → (LiftT (CompatUpTo.tech F) Seq) ≼ Seq
-  compat-seq F zero = Top! (CompatUpTo.trans F Top)
-  compat-seq F (suc n) =
+  compat-seq F zero     = Top! (CompatUpTo.trans F Top)
+  compat-seq F (suc n)  =
     ⊆-trans {ar}
             (compat (Seq₀ n))
             (monoΦ (LiftT tech Seq .IRel.rel n) (Seq₀ n) (compat-seq F n))
