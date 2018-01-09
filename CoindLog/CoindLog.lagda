@@ -9,7 +9,7 @@ open import Data.List
 open import Data.Nat hiding (pred)
 open import Data.Nat.Properties
 open import Data.Unit hiding (_≤_)
-open import Data.Product
+open import Data.Product as Prod
 open import Function
 \end{code}
 
@@ -30,6 +30,21 @@ _⊆_ {X ∷ ar}  R S = ∀ (x : X) → R x ⊆ S x
 ⊆-trans : {ar : Arity} {R S T : Rel ar} → R ⊆ S → S ⊆ T → R ⊆ T
 ⊆-trans {[]}      p q = q ∘ p
 ⊆-trans {X ∷ ar}  p q = λ x → ⊆-trans {ar} (p x) (q x)
+
+_⋀_ : {ar : Arity} → Rel ar → Rel ar → Rel ar
+_⋀_ {[]} R S = R × S
+_⋀_ {X ∷ ar} R S = λ x → R x ⋀ S x
+
+⋀-mono : ∀ {ar : Arity} {R S R' S' : Rel ar} →
+         R ⊆ R' → S ⊆ S' → (R ⋀ S) ⊆ (R' ⋀ S')
+⋀-mono {[]}      p q = Prod.map p q
+⋀-mono {X ∷ ar}  p q = λ x → ⋀-mono {ar} (p x) (q x)
+
+⋀-pair : ∀ {ar : Arity} {R₁ R₂ S : Rel ar} →
+         S ⊆ R₁ → S ⊆ R₂ → S ⊆ (R₁ ⋀ R₂)
+⋀-pair {[]}      p q = < p , q >
+⋀-pair {X ∷ ar}  p q = λ x → ⋀-pair {ar} (p x) (q x)
+
 \end{code}
 
 Full relation
@@ -49,11 +64,14 @@ the lattice of relations.
 RelT₀ : (ar : Arity) → Set₁
 RelT₀ ar = Rel ar → Rel ar
 
+Monotone : {ar : Arity} → RelT₀ ar → Set₁
+Monotone Φ = ∀ R S → R ⊆ S → Φ R ⊆ Φ S
+
 record RelT (ar : Arity) : Set₁ where
   constructor relT
   field
     trans  : RelT₀ ar
-    mono   : ∀ R S → R ⊆ S → trans R ⊆ trans S
+    mono   : Monotone trans
 
 _⊑_ : {ar : Arity} → RelT ar → RelT ar → Set₁
 (relT F _) ⊑ (relT G _) = ∀ R → F R ⊆ G R
@@ -63,6 +81,18 @@ _⊚_ : {ar : Arity} → RelT ar → RelT ar → RelT ar
   where
     mono : (R S : Rel _) → R ⊆ S → G (F R) ⊆ G (F S)
     mono R S p = monoG (F R) (F S) (monoF R S p)
+
+_⊗₀_ : {ar : Arity} → RelT₀ ar → RelT₀ ar → RelT₀ ar
+(F ⊗₀ G) R = F R ⋀ G R
+
+_⊗_ : {ar : Arity} → RelT ar → RelT ar → RelT ar
+_⊗_ {ar} (relT F monoF) (relT G monoG) = relT (F ⊗₀ G) mono
+  where
+    mono : Monotone (F ⊗₀ G)
+    mono R S R⊆S = ⋀-mono {ar} (monoF R S R⊆S) (monoG R S R⊆S)
+
+pairT : ∀{ar} {T₁ T₂ U : RelT ar} → U ⊑ T₁ → U ⊑ T₂ → U ⊑ (T₁ ⊗ T₂)
+pairT {ar} p q R = ⋀-pair {ar} (p R) (q R)
 \end{code}
 
 Compatible up-to techniques
@@ -89,6 +119,11 @@ _∈'_ {X ∷ ar} (t , ts)  R = ts ∈' R t
 ∈-mono {[]}      p ts        q = p q
 ∈-mono {x ∷ ar}  p (t , ts)  q = ∈-mono (p t) ts q
 
+∈-⋀-distr : {ar : Arity} {R S : Rel ar} →
+            ∀ ts → ts ∈' R × ts ∈' S → ts ∈' (R ⋀ S)
+∈-⋀-distr {[]}      ts        p       = p
+∈-⋀-distr {X ∷ ar}  (t , ts)  (p , q) = ∈-⋀-distr {ar} ts (p , q)
+
 Top-∈ : {ar : Arity} → (ts : Terms ar) → ts ∈' Top
 Top-∈ {[]}     _         = tt
 Top-∈ {x ∷ ar} (t , ts)  = Top-∈ ts
@@ -103,7 +138,7 @@ record IRel (ar : Arity) : Set₁ where
   constructor iRel
   field
     rel  : IRel₀ ar
-    dec  : ∀ n m → m ≤ n → rel n ⊆ rel m
+    dec  : ∀ {n m} → m ≤ n → rel n ⊆ rel m
 
 _≼_ : {ar : Arity} → IRel ar → IRel ar → Set
 (iRel R _) ≼ (iRel S _) = ∀ n → R n ⊆ S n
@@ -114,8 +149,13 @@ LiftT {ar} (relT Φ mono) (iRel R decR) = iRel ΦR dec
     ΦR : IRel₀ ar
     ΦR n = Φ (R n)
 
-    dec : (n m : ℕ) → m ≤ n → ΦR n ⊆ ΦR m
-    dec n m p = mono (R n) (R m) (decR n m p)
+    dec : {n m : ℕ} → m ≤ n → ΦR n ⊆ ΦR m
+    dec {n} {m} p = mono (R n) (R m) (decR p)
+
+liftT-mono : ∀ {ar : Arity} (F : RelT ar) {R S} →
+             R ≼ S → LiftT F R ≼ LiftT F S
+liftT-mono (relT Φ mono) p n = mono _ _ (p n)
+
 \end{code}
 
 Indexed predicates
@@ -127,7 +167,9 @@ record IPred : Set₁ where
   constructor iPred
   field
     pred  : IPred₀
-    dec   : ∀ n m → m ≤ n → pred n → pred m
+    dec   : ∀ {n m} → m ≤ n → pred n → pred m
+
+infix 4 _∈_ _∈₀_
 
 _∈₀_ : {ar : Arity} → Terms ar → IRel₀ ar → IPred₀
 (ts ∈₀ R) n = ts ∈' R n
@@ -135,8 +177,8 @@ _∈₀_ : {ar : Arity} → Terms ar → IRel₀ ar → IPred₀
 _∈_ : {ar : Arity} → Terms ar → IRel ar → IPred
 ts ∈ (iRel R decR) = iPred (ts ∈₀ R) dec
   where
-    dec : (n m : ℕ) → m ≤ n → ts ∈' R n → ts ∈' R m
-    dec n m m≤n p = ∈-mono (decR n m m≤n) ts p
+    dec : {n m : ℕ} → m ≤ n → ts ∈' R n → ts ∈' R m
+    dec m≤n p = ∈-mono (decR m≤n) ts p
 
 _⇒₀_ : IPred₀ → IPred₀ → IPred₀
 (φ ⇒₀ ψ) n = ∀ m → m ≤ n → φ m → ψ m
@@ -144,14 +186,50 @@ _⇒₀_ : IPred₀ → IPred₀ → IPred₀
 _⇒_ : IPred → IPred → IPred
 (iPred φ decφ) ⇒ (iPred ψ decψ) = iPred (φ ⇒₀ ψ) dec
   where
-    dec : (n m : ℕ) → m ≤ n → (φ ⇒₀ ψ) n → (φ ⇒₀ ψ) m
-    dec n m m≤n p k k≤m q = decψ k k ≤-refl (p k (≤-trans k≤m m≤n) q)
+    dec : {n m : ℕ} → m ≤ n → (φ ⇒₀ ψ) n → (φ ⇒₀ ψ) m
+    dec m≤n p k k≤m q = decψ ≤-refl (p k (≤-trans k≤m m≤n) q)
+
+_∧₀_ : IPred₀ → IPred₀ → IPred₀
+(φ ∧₀ ψ) n = φ n × ψ n
+
+_∧_ : IPred → IPred → IPred
+(iPred φ decφ) ∧ (iPred ψ decψ) = iPred (φ ∧₀ ψ) dec
+  where
+    dec : {n m : ℕ} → m ≤ n → (φ ∧₀ ψ) n → (φ ∧₀ ψ) m
+    dec m≤n (p , q) = (decφ m≤n p , decψ m≤n q)
+
+infix 2 _⟶_
 
 _⟶_ : IPred → IPred → Set
 (iPred φ _) ⟶ (iPred ψ _) = ∀ n → φ n → ψ n
 
-≼→∈ : {ar : Arity} {R S : IRel ar} → R ≼ S → ∀ ts → (ts ∈ R) ⟶ (ts ∈ S)
+≼→∈ : {ar : Arity} {R S : IRel ar} → R ≼ S → ∀ ts → ts ∈ R ⟶ ts ∈ S
 ≼→∈ p ts n q = ∈-mono (p n) ts q
+
+infixr 9 _⊛_
+
+_⊛_ : ∀ {P Q S} → (g : Q ⟶ S) (f : P ⟶ Q) → P ⟶ S
+(g ⊛ f) n x = g n (f n x)
+
+abstr : ∀ {φ ψ γ} → (φ ∧ ψ ⟶ γ) → (φ ⟶ ψ ⇒ γ)
+abstr {iPred φ decφ} p n φn m m≤n ψm = p m (decφ m≤n φn , ψm)
+
+π₁ : ∀ {φ ψ} → φ ∧ ψ ⟶ φ
+π₁ n = proj₁
+
+π₂ : ∀ {φ ψ} → φ ∧ ψ ⟶ ψ
+π₂ n = proj₂
+
+pair : ∀ {φ ψ γ} → (γ ⟶ φ) → (γ ⟶ ψ) → (γ ⟶ φ ∧ ψ)
+pair f g n p = (f n p , g n p)
+
+∈-liftT-⊗-distr : ∀ {ar} (T₁ T₂ : RelT ar) → ∀ P s →
+                  ((s ∈ LiftT T₁ P) ∧ (s ∈ LiftT T₂ P)) ⟶
+                  (s ∈ LiftT (T₁ ⊗ T₂) P)
+∈-liftT-⊗-distr {ar} T₁ T₂ P s n x =
+  let p₁ = π₁ {s ∈ LiftT T₁ P} {s ∈ LiftT T₂ P}
+      p₂ = π₂ {s ∈ LiftT T₁ P} {s ∈ LiftT T₂ P}
+  in ∈-⋀-distr s (p₁ n x , p₂ n x)
 \end{code}
 
 Later modality for indexed predicates
@@ -163,17 +241,39 @@ Later modality for indexed predicates
     ▶φ zero     = ⊤
     ▶φ (suc n)  = φ n
 
-    dec : (n m : ℕ) → m ≤ n → ▶φ n → ▶φ m
-    dec n         .0        z≤n        p = tt
-    dec .(suc _)  .(suc _)  (s≤s m≤n)  p = decφ _ _ m≤n p
+    dec : {n m : ℕ} → m ≤ n → ▶φ n → ▶φ m
+    dec {n}         {.0}        z≤n        p = tt
+    dec {.(suc _)}  {.(suc _)}  (s≤s m≤n)  p = decφ m≤n p
 
-next : {φ : IPred} → φ ⟶ ▶ φ
-next                 zero     p = tt
-next {iPred φ decφ}  (suc n)  p = decφ (1 + n) n (n≤1+n n) p
+next : (φ : IPred) → φ ⟶ ▶ φ
+next _               zero     p = tt
+next (iPred φ decφ)  (suc n)  p = decφ {1 + n} (n≤1+n n) p
 
 mon : {φ ψ : IPred} → (φ ⟶ ψ) → (▶ φ ⟶ ▶ ψ)
 mon p zero     q = tt
 mon p (suc n)  q = p n q
+
+▶-∧-distr : {φ ψ : IPred} → ▶ (φ ∧ ψ) ⟶ (▶ φ ∧ ▶ ψ)
+▶-∧-distr {φ} {ψ} = pair {▶ φ} {▶ ψ} {▶ (φ ∧ ψ)}
+                    (mon {φ ∧ ψ} {φ} (π₁ {φ} {ψ}))
+                    (mon {φ ∧ ψ} {ψ} (π₂ {φ} {ψ}))
+
+▶-pres-∧ : {φ ψ : IPred} → (▶ φ ∧ ▶ ψ) ⟶ ▶ (φ ∧ ψ)
+▶-pres-∧ zero     p = tt
+▶-pres-∧ (suc n)  p = p
+
+
+▷ : {ar : Arity} → IRel ar → IRel ar
+▷ {ar} (iRel R decR) = iRel ▷R dec
+  where
+    ▷R : IRel₀ ar
+    ▷R zero     = Top
+    ▷R (suc n)  = R n
+
+    dec : {n m : ℕ} → m ≤ n → ▷R n ⊆ ▷R m
+    dec {n}         {.0}        z≤n        = Top! (▷R n)
+    dec {.(suc _)}  {.(suc _)}  (s≤s m≤n)  = decR m≤n
+
 \end{code}
 
 Löb induction
@@ -199,9 +299,9 @@ module ChainReasoning {ar : Arity} (T : RelT ar) where
   Seq : IRel ar
   Seq = iRel Seq₀ dec
     where
-      dec : (n m : ℕ) → m ≤ n → Seq₀ n ⊆ Seq₀ m
-      dec n        .0        z≤n     = Top! (Seq₀ n)
-      dec (suc n)  (suc m)  (s≤s p)  = monoΦ (Seq₀ n) (Seq₀ m) (dec _ _ p)
+      dec : {n m : ℕ} → m ≤ n → Seq₀ n ⊆ Seq₀ m
+      dec {n}      {.0}        z≤n   = Top! (Seq₀ n)
+      dec {suc n}  {suc m}  (s≤s p)  = monoΦ (Seq₀ n) (Seq₀ m) (dec p)
 \end{code}
 
 Unfolding of the operator on the sequence.
@@ -227,8 +327,22 @@ This will allow us to import them into recursive proofs.
 
   compat-∈ : (F : CompatUpTo T) (ts : Terms ar) →
              (ts ∈ LiftT (CompatUpTo.tech F) Seq) ⟶ (ts ∈ Seq)
-  compat-∈ F ts n p =
-    ≼→∈ {ar} {LiftT (CompatUpTo.tech F) Seq} {Seq} (compat-seq F) ts n p
+  compat-∈ F =
+    ≼→∈ {ar} {LiftT (CompatUpTo.tech F) Seq} {Seq} (compat-seq F)
+
+  compat-step : (F : CompatUpTo T) →
+                (LiftT (CompatUpTo.tech F) (▷ Seq)) ≼ (▷ Seq)
+  compat-step F zero     = Top! (CompatUpTo.trans F Top)
+  compat-step F (suc n)  = compat-seq F n
+
+  compat-∈-step : (F : CompatUpTo T) (ts : Terms ar) →
+                  ▶ (ts ∈ LiftT (CompatUpTo.tech F) Seq) ⟶ ▶ (ts ∈ Seq)
+  compat-∈-step F ts =
+    mon {ts ∈ LiftT (CompatUpTo.tech F) Seq} {ts ∈ Seq} (compat-∈ F ts)
+
+  -- compat-∈-step' : (F : CompatUpTo T) (ts : Terms ar) →
+  --                  ▶ (ts ∈ Seq) ⟶  ▶ (CompatUpTo.trans F ts ∈ Seq)
+  -- compat-∈-step' = ?
 \end{code}
 
 TODO:
