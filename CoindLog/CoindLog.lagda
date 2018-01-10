@@ -158,50 +158,56 @@ liftT-mono (relT Φ mono) p n = mono _ _ (p n)
 
 \end{code}
 
-Indexed predicates
+Indexed formulas
 \begin{code}
-IPred₀ : Set₁
-IPred₀ = ℕ → Set
+IForm₀ : Set₁
+IForm₀ = ℕ → Set
 
-record IPred : Set₁ where
-  constructor iPred
-  field
-    pred  : IPred₀
-    dec   : ∀ {n m} → m ≤ n → pred n → pred m
+IForm : Set₁
+IForm = IRel []
 
+-- | Rexport destructors of IRel with more fitting names
+module IForm (φ : IForm) where
+  open IRel φ public renaming (rel to form)
+
+pattern iForm φ dec = iRel φ dec
+\end{code}
+
+Some useful constructions form indexed formulas
+\begin{code}
 infix 4 _∈_ _∈₀_
 
-_∈₀_ : {ar : Arity} → Terms ar → IRel₀ ar → IPred₀
+_∈₀_ : {ar : Arity} → Terms ar → IRel₀ ar → IForm₀
 (ts ∈₀ R) n = ts ∈' R n
 
-_∈_ : {ar : Arity} → Terms ar → IRel ar → IPred
-ts ∈ (iRel R decR) = iPred (ts ∈₀ R) dec
+_∈_ : {ar : Arity} → Terms ar → IRel ar → IForm
+ts ∈ (iRel R decR) = iForm (ts ∈₀ R) dec
   where
     dec : {n m : ℕ} → m ≤ n → ts ∈' R n → ts ∈' R m
     dec m≤n p = ∈-mono (decR m≤n) ts p
 
-_⇒₀_ : IPred₀ → IPred₀ → IPred₀
+_⇒₀_ : IForm₀ → IForm₀ → IForm₀
 (φ ⇒₀ ψ) n = ∀ m → m ≤ n → φ m → ψ m
 
-_⇒_ : IPred → IPred → IPred
-(iPred φ decφ) ⇒ (iPred ψ decψ) = iPred (φ ⇒₀ ψ) dec
+_⇒_ : IForm → IForm → IForm
+(iForm φ decφ) ⇒ (iForm ψ decψ) = iForm (φ ⇒₀ ψ) dec
   where
     dec : {n m : ℕ} → m ≤ n → (φ ⇒₀ ψ) n → (φ ⇒₀ ψ) m
     dec m≤n p k k≤m q = decψ ≤-refl (p k (≤-trans k≤m m≤n) q)
 
-_∧₀_ : IPred₀ → IPred₀ → IPred₀
+_∧₀_ : IForm₀ → IForm₀ → IForm₀
 (φ ∧₀ ψ) n = φ n × ψ n
 
-_∧_ : IPred → IPred → IPred
-(iPred φ decφ) ∧ (iPred ψ decψ) = iPred (φ ∧₀ ψ) dec
+_∧_ : IForm → IForm → IForm
+(iForm φ decφ) ∧ (iForm ψ decψ) = iForm (φ ∧₀ ψ) dec
   where
     dec : {n m : ℕ} → m ≤ n → (φ ∧₀ ψ) n → (φ ∧₀ ψ) m
     dec m≤n (p , q) = (decφ m≤n p , decψ m≤n q)
 
 infix 2 _⟶_
 
-_⟶_ : IPred → IPred → Set
-(iPred φ _) ⟶ (iPred ψ _) = ∀ n → φ n → ψ n
+_⟶_ : IForm → IForm → Set
+_⟶_ = _≼_
 
 ≼→∈ : {ar : Arity} {R S : IRel ar} → R ≼ S → ∀ ts → ts ∈ R ⟶ ts ∈ S
 ≼→∈ p ts n q = ∈-mono (p n) ts q
@@ -231,7 +237,7 @@ _⊛_ : ∀ {P Q S} → (g : Q ⟶ S) (f : P ⟶ Q) → P ⟶ S
 (g ⊛ f) n x = g n (f n x)
 
 abstr : ∀ {φ ψ γ} → (φ ∧ ψ ⟶ γ) → (φ ⟶ ψ ⇒ γ)
-abstr {iPred φ decφ} p n φn m m≤n ψm = p m (decφ m≤n φn , ψm)
+abstr {iForm φ decφ} p n φn m m≤n ψm = p m (decφ m≤n φn , ψm)
 
 π₁ : ∀ {φ ψ} → φ ∧ ψ ⟶ φ
 π₁ n = proj₁
@@ -251,56 +257,76 @@ pair f g n p = (f n p , g n p)
   in ∈-⋀-distr s (p₁ n x , p₂ n x)
 \end{code}
 
-Later modality for indexed predicates
+Later modality for indexed relations
 \begin{code}
-▶ : IPred → IPred
-▶ (iPred φ decφ) = iPred ▶φ dec
+▶ : {ar : Arity} → IRel ar → IRel ar
+▶ {ar} (iRel R decR) = iRel ▶R dec
   where
-    ▶φ : IPred₀
-    ▶φ zero     = ⊤
-    ▶φ (suc n)  = φ n
+    ▶R : IRel₀ ar
+    ▶R zero     = Top
+    ▶R (suc n)  = R n
 
-    dec : {n m : ℕ} → m ≤ n → ▶φ n → ▶φ m
-    dec {n}         {.0}        z≤n        p = tt
-    dec {.(suc _)}  {.(suc _)}  (s≤s m≤n)  p = decφ m≤n p
+    dec : {n m : ℕ} → m ≤ n → ▶R n ⊆ ▶R m
+    dec {n}         {.0}        z≤n        = Top! (▶R n)
+    dec {.(suc _)}  {.(suc _)}  (s≤s m≤n)  = decR m≤n
 
-next : (φ : IPred) → φ ⟶ ▶ φ
+next : (φ : IForm) → φ ⟶ ▶ φ
 next _               zero     p = tt
-next (iPred φ decφ)  (suc n)  p = decφ {1 + n} (n≤1+n n) p
+next (iForm φ decφ)  (suc n)  p = decφ {1 + n} (n≤1+n n) p
 
-mon : {φ ψ : IPred} → (φ ⟶ ψ) → (▶ φ ⟶ ▶ ψ)
+mon : {φ ψ : IForm} → (φ ⟶ ψ) → (▶ φ ⟶ ▶ ψ)
 mon p zero     q = tt
 mon p (suc n)  q = p n q
 
-▶-∧-distr : {φ ψ : IPred} → ▶ (φ ∧ ψ) ⟶ (▶ φ ∧ ▶ ψ)
+▶-∧-distr : {φ ψ : IForm} → ▶ (φ ∧ ψ) ⟶ (▶ φ ∧ ▶ ψ)
 ▶-∧-distr {φ} {ψ} = pair {▶ φ} {▶ ψ} {▶ (φ ∧ ψ)}
                     (mon {φ ∧ ψ} {φ} (π₁ {φ} {ψ}))
                     (mon {φ ∧ ψ} {ψ} (π₂ {φ} {ψ}))
 
-▶-pres-∧ : {φ ψ : IPred} → (▶ φ ∧ ▶ ψ) ⟶ ▶ (φ ∧ ψ)
+▶-pres-∧ : {φ ψ : IForm} → (▶ φ ∧ ▶ ψ) ⟶ ▶ (φ ∧ ψ)
 ▶-pres-∧ zero     p = tt
 ▶-pres-∧ (suc n)  p = p
-
-
-▷ : {ar : Arity} → IRel ar → IRel ar
-▷ {ar} (iRel R decR) = iRel ▷R dec
-  where
-    ▷R : IRel₀ ar
-    ▷R zero     = Top
-    ▷R (suc n)  = R n
-
-    dec : {n m : ℕ} → m ≤ n → ▷R n ⊆ ▷R m
-    dec {n}         {.0}        z≤n        = Top! (▷R n)
-    dec {.(suc _)}  {.(suc _)}  (s≤s m≤n)  = decR m≤n
 
 \end{code}
 
 Löb induction
 \begin{code}
-löb : {φ : IPred} → (▶ φ ⇒ φ) ⟶ φ
+löb : {φ : IForm} → (▶ φ ⇒ φ) ⟶ φ
 löb      zero     p = p zero z≤n tt
 löb {φ}  (suc n)  p =
   p (suc n) ≤-refl (löb {φ} n (λ m m≤n ▶φm → p m (≤-step m≤n) ▶φm))
+
+meta-löb : {φ : IForm} →
+  (▶ φ ⟶ φ)
+  → -----------------------
+  (i⊤ ⟶ φ)
+meta-löb {φ} f =
+  _⊛_ {_} {▶ φ ⇒ φ} {φ}
+  (löb {φ})
+  (abstr {i⊤} {▶ φ} {φ}
+    (_⊛_ {i⊤ ∧ ▶ φ} {▶ φ} {φ}
+      f
+      (π₂ {i⊤} {▶ φ})))
+
+meta-i⊤ : ∀{φ} → (i⊤ ⟶ φ) → ⊢ φ
+meta-i⊤ f n = f n tt
+
+meta-i⊤₁ : ∀{φ} → ⊢ φ → (i⊤ ⟶ φ)
+meta-i⊤₁ p = λ n _ → p n
+
+meta-axiom : ∀{φ} → (i⊤ ⟶ φ) → ∀ ψ → (ψ ⟶ φ)
+meta-axiom {φ} f ψ = _⊛_ {ψ} {i⊤} {φ} f (i⊤-final ψ)
+
+meta-löb' : {φ : IForm} →
+  ⊢ (▶ φ ⇒ φ)
+  → -----------------------
+  ⊢ φ
+meta-löb' {φ} p =
+  meta-i⊤ {φ}
+    (_⊛_ {_} {▶ φ ⇒ φ} {φ}
+      (löb {φ})
+      (meta-i⊤₁ {▶ φ ⇒ φ} p))
+
 \end{code}
 
 \begin{code}
@@ -350,7 +376,7 @@ This will allow us to import them into recursive proofs.
     ≼→∈ {ar} {LiftT (CompatUpTo.tech F) Seq} {Seq} (compat-seq F)
 
   compat-step : (F : CompatUpTo T) →
-                (LiftT (CompatUpTo.tech F) (▷ Seq)) ≼ (▷ Seq)
+                (LiftT (CompatUpTo.tech F) (▶ Seq)) ≼ (▶ Seq)
   compat-step F zero     = Top! (CompatUpTo.trans F Top)
   compat-step F (suc n)  = compat-seq F n
 
