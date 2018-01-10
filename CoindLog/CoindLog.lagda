@@ -206,6 +206,25 @@ _⟶_ : IPred → IPred → Set
 ≼→∈ : {ar : Arity} {R S : IRel ar} → R ≼ S → ∀ ts → ts ∈ R ⟶ ts ∈ S
 ≼→∈ p ts n q = ∈-mono (p n) ts q
 
+i⊤ : IForm
+i⊤ = iForm (λ _ → ⊤) (λ _ x → x)
+
+i⊤-final : ∀ φ → (φ ⟶ i⊤)
+i⊤-final φ n _ = tt
+
+i⊤-intro : ∀ {φ} → φ ⟶ i⊤ ∧ φ
+i⊤-intro n p = tt , p
+
+pack : List IForm → IForm
+pack []        = i⊤
+pack (φ ∷ φs)  = φ ∧ (pack φs)
+
+_⊢_ : List IForm → IForm → Set
+φs ⊢ ψ = pack φs ⟶ ψ
+
+⊢_ : IForm → Set
+⊢ φ = ∀ n → IForm.form φ n
+
 infixr 9 _⊛_
 
 _⊛_ : ∀ {P Q S} → (g : Q ⟶ S) (f : P ⟶ Q) → P ⟶ S
