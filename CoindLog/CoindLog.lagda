@@ -5,7 +5,7 @@
 \begin{code}
 module CoindLog where
 
-open import Data.List
+open import Data.List as List
 open import Data.Nat hiding (pred)
 open import Data.Nat.Properties
 open import Data.Unit hiding (_≤_)
@@ -26,6 +26,10 @@ Rel (X ∷ Xs)  = X → Rel Xs
 _⊆_ : {ar : Arity} → Rel ar → Rel ar → Set
 _⊆_ {[]}      R S = R → S
 _⊆_ {X ∷ ar}  R S = ∀ (x : X) → R x ⊆ S x
+
+⊆-refl : {ar : Arity} (R : Rel ar) → R ⊆ R
+⊆-refl {[]}      R = id
+⊆-refl {X ∷ ar}  R = λ x → ⊆-refl (R x)
 
 ⊆-trans : {ar : Arity} {R S T : Rel ar} → R ⊆ S → S ⊆ T → R ⊆ T
 ⊆-trans {[]}      p q = q ∘ p
@@ -143,6 +147,9 @@ record IRel (ar : Arity) : Set₁ where
 _≼_ : {ar : Arity} → IRel ar → IRel ar → Set
 (iRel R _) ≼ (iRel S _) = ∀ n → R n ⊆ S n
 
+≼-refl : {ar : Arity} (R : IRel ar) → R ≼ R
+≼-refl (iRel R _) n = ⊆-refl (R n)
+
 LiftT : {ar : Arity} → RelT ar → IRel ar → IRel ar
 LiftT {ar} (relT Φ mono) (iRel R decR) = iRel ΦR dec
   where
@@ -189,6 +196,8 @@ ts ∈ (iRel R decR) = iForm (ts ∈₀ R) dec
 _⇒₀_ : IForm₀ → IForm₀ → IForm₀
 (φ ⇒₀ ψ) n = ∀ m → m ≤ n → φ m → ψ m
 
+infix 3 _⇒_
+
 _⇒_ : IForm → IForm → IForm
 (iForm φ decφ) ⇒ (iForm ψ decψ) = iForm (φ ⇒₀ ψ) dec
   where
@@ -209,6 +218,9 @@ infix 2 _⟶_
 _⟶_ : IForm → IForm → Set
 _⟶_ = _≼_
 
+iId : ∀ φ → φ ⟶ φ
+iId = ≼-refl
+
 ≼→∈ : {ar : Arity} {R S : IRel ar} → R ≼ S → ∀ ts → ts ∈ R ⟶ ts ∈ S
 ≼→∈ p ts n q = ∈-mono (p n) ts q
 
@@ -221,16 +233,6 @@ i⊤-final φ n _ = tt
 i⊤-intro : ∀ {φ} → φ ⟶ i⊤ ∧ φ
 i⊤-intro n p = tt , p
 
-pack : List IForm → IForm
-pack []        = i⊤
-pack (φ ∷ φs)  = φ ∧ (pack φs)
-
-_⊢_ : List IForm → IForm → Set
-φs ⊢ ψ = pack φs ⟶ ψ
-
-⊢_ : IForm → Set
-⊢ φ = ∀ n → IForm.form φ n
-
 infixr 9 _⊛_
 
 _⊛_ : ∀ {P Q S} → (g : Q ⟶ S) (f : P ⟶ Q) → P ⟶ S
@@ -238,6 +240,15 @@ _⊛_ : ∀ {P Q S} → (g : Q ⟶ S) (f : P ⟶ Q) → P ⟶ S
 
 abstr : ∀ {φ ψ γ} → (φ ∧ ψ ⟶ γ) → (φ ⟶ ψ ⇒ γ)
 abstr {iForm φ decφ} p n φn m m≤n ψm = p m (decφ m≤n φn , ψm)
+
+unabstr : ∀ {φ ψ γ} → (φ ⟶ ψ ⇒ γ) → (φ ∧ ψ ⟶ γ)
+unabstr p n φ∧ψn =
+  let φn = proj₁ φ∧ψn
+      ψn = proj₂ φ∧ψn
+  in p n φn n ≤-refl ψn
+
+ev : ∀ φ ψ → (φ ⇒ ψ) ∧ φ ⟶ ψ
+ev φ ψ = unabstr {φ ⇒ ψ} {φ} {ψ} (iId (φ ⇒ ψ))
 
 π₁ : ∀ {φ ψ} → φ ∧ ψ ⟶ φ
 π₁ n = proj₁
@@ -247,6 +258,12 @@ abstr {iForm φ decφ} p n φn m m≤n ψm = p m (decφ m≤n φn , ψm)
 
 pair : ∀ {φ ψ γ} → (γ ⟶ φ) → (γ ⟶ ψ) → (γ ⟶ φ ∧ ψ)
 pair f g n p = (f n p , g n p)
+
+map-∧ : ∀ {φ ψ φ' ψ'} → (φ ⟶ φ') → (ψ ⟶ ψ') → (φ ∧ ψ ⟶ φ' ∧ ψ')
+map-∧ {φ} {ψ} {φ'} {ψ'} f g =
+  pair {φ'} {ψ'} {φ ∧ ψ}
+    (_⊛_ {φ ∧ ψ} {φ} {φ'} f (π₁ {φ} {ψ}))
+    (_⊛_ {φ ∧ ψ} {ψ} {ψ'} g (π₂ {φ} {ψ}))
 
 ∈-liftT-⊗-distr : ∀ {ar} (T₁ T₂ : RelT ar) → ∀ P s →
                   ((s ∈ LiftT T₁ P) ∧ (s ∈ LiftT T₂ P)) ⟶
@@ -278,14 +295,14 @@ mon : {φ ψ : IForm} → (φ ⟶ ψ) → (▶ φ ⟶ ▶ ψ)
 mon p zero     q = tt
 mon p (suc n)  q = p n q
 
-▶-∧-distr : {φ ψ : IForm} → ▶ (φ ∧ ψ) ⟶ (▶ φ ∧ ▶ ψ)
-▶-∧-distr {φ} {ψ} = pair {▶ φ} {▶ ψ} {▶ (φ ∧ ψ)}
+▶-∧-distr : (φ ψ : IForm) → ▶ (φ ∧ ψ) ⟶ (▶ φ ∧ ▶ ψ)
+▶-∧-distr φ ψ = pair {▶ φ} {▶ ψ} {▶ (φ ∧ ψ)}
                     (mon {φ ∧ ψ} {φ} (π₁ {φ} {ψ}))
                     (mon {φ ∧ ψ} {ψ} (π₂ {φ} {ψ}))
 
-▶-pres-∧ : {φ ψ : IForm} → (▶ φ ∧ ▶ ψ) ⟶ ▶ (φ ∧ ψ)
-▶-pres-∧ zero     p = tt
-▶-pres-∧ (suc n)  p = p
+▶-pres-∧ : (φ ψ : IForm) → (▶ φ ∧ ▶ ψ) ⟶ ▶ (φ ∧ ψ)
+▶-pres-∧ _ _ zero     p = tt
+▶-pres-∧ _ _ (suc n)  p = p
 
 \end{code}
 
@@ -308,25 +325,202 @@ meta-löb {φ} f =
       f
       (π₂ {i⊤} {▶ φ})))
 
+pack : List IForm → IForm
+pack []        = i⊤
+pack (φ ∷ φs)  = (pack φs) ∧ φ
+
+infixl 1 _⊢_ ⊢_
+
+_⊢_ : List IForm → IForm → Set
+φs ⊢ ψ = pack φs ⟶ ψ
+
+⊢_ : IForm → Set
+⊢ φ = [] ⊢ φ
+-- ⊢ φ = ∀ n → IForm.form φ n
+
+valid : ∀{φ} → ⊢ φ → ∀ n → IForm.form φ n
+valid p n = p n tt
+
 meta-i⊤ : ∀{φ} → (i⊤ ⟶ φ) → ⊢ φ
-meta-i⊤ f n = f n tt
+meta-i⊤ = id
 
 meta-i⊤₁ : ∀{φ} → ⊢ φ → (i⊤ ⟶ φ)
-meta-i⊤₁ p = λ n _ → p n
+meta-i⊤₁ = id
 
 meta-axiom : ∀{φ} → (i⊤ ⟶ φ) → ∀ ψ → (ψ ⟶ φ)
 meta-axiom {φ} f ψ = _⊛_ {ψ} {i⊤} {φ} f (i⊤-final ψ)
 
-meta-löb' : {φ : IForm} →
-  ⊢ (▶ φ ⇒ φ)
-  → -----------------------
-  ⊢ φ
-meta-löb' {φ} p =
-  meta-i⊤ {φ}
-    (_⊛_ {_} {▶ φ ⇒ φ} {φ}
-      (löb {φ})
-      (meta-i⊤₁ {▶ φ ⇒ φ} p))
+-- meta-löb' : {φ : IForm} →
+--   ⊢ (▶ φ ⇒ φ)
+--   → -----------------------
+--   ⊢ φ
+-- meta-löb' {φ} p =
+--   meta-i⊤ {φ}
+--     (_⊛_ {_} {▶ φ ⇒ φ} {φ}
+--       (löb {φ})
+--       (meta-i⊤₁ {▶ φ ⇒ φ} p))
 
+-- cut' : {φ ψ γ : IForm} →
+--   ⊢ φ ⇒ ψ →
+--   ⊢ ψ ⇒ γ
+--   → -----------------------
+--   ⊢ φ ⇒ γ
+-- cut' {φ} {ψ} {γ} p q =
+--   let f = unabstr {i⊤} {φ} {ψ} (meta-i⊤₁ {φ ⇒ ψ} p)
+--       g = unabstr {i⊤} {ψ} {γ} (meta-i⊤₁ {ψ ⇒ γ} q)
+--       g' = _⊛_ {ψ} {i⊤ ∧ ψ} {γ} g (pair {i⊤} {ψ} {ψ} (i⊤-final ψ) (iId ψ))
+--       h = abstr {i⊤} {φ} {γ} (_⊛_ {i⊤ ∧ φ} {ψ} {γ} g' f)
+--   in meta-i⊤ {φ ⇒ γ} h
+
+-- axiom : {Γ : List IForm} {φ ψ : IForm} →
+--   φ ⟶ ψ →
+--   -----------
+--   φ ∷ Γ ⊢ ψ
+-- axiom {Γ} {φ} {ψ} f =
+--     _⊛_ {pack Γ ∧ φ} {φ} {ψ}
+--     f
+--     (π₂ {pack Γ} {φ})
+
+axiom : {Γ : List IForm} {φ ψ : IForm} →
+  φ ⟶ ψ →
+  -----------
+  Γ ⊢ φ ⇒ ψ
+axiom {Γ} {φ} {ψ} f =
+  abstr {pack Γ} {φ} {ψ}
+    (_⊛_ {pack Γ ∧ φ} {φ} {ψ}
+      f
+      (π₂ {pack Γ} {φ}))
+
+cut : {Γ : List IForm} {φ ψ : IForm} →
+  Γ ⊢ φ →
+  (φ ∷ Γ) ⊢ ψ
+  → -----------------------
+  Γ ⊢ ψ
+cut {Γ} {φ} {ψ} p q =
+  let p' = pair {pack Γ} {φ} {pack Γ} (iId (pack Γ)) p
+  in _⊛_ {pack Γ} {pack Γ ∧ φ} {ψ} q p'
+
+-- cut' : ∀ {Γ} {φ ψ γ : IForm} →
+--   Γ ⊢ φ ⇒ ψ →
+--   Γ ⊢ ψ ⇒ γ
+--   → -----------------------
+--   Γ ⊢ φ ⇒ γ
+-- cut' {Γ} {φ} {ψ} {γ} p q = {!!}
+
+proj : (Γ : List IForm) (φ : IForm) →
+  -----------------------
+  φ ∷ Γ ⊢ φ
+proj Γ φ = π₂ {pack Γ} {φ}
+
+weaken : {Γ : List IForm} {φ : IForm} (ψ : IForm) →
+  Γ ⊢ φ                   →
+  -----------------------
+  ψ ∷ Γ ⊢ φ
+weaken {Γ} {φ} ψ p =
+  _⊛_ {pack Γ ∧ ψ} {pack Γ} {φ} p (π₁ {pack Γ} {ψ})
+
+⇒-intro : {Γ : List IForm} {φ ψ : IForm} →
+  (φ ∷ Γ) ⊢ ψ
+  → -----------------------
+  Γ ⊢ φ ⇒ ψ
+⇒-intro {Γ} {φ} {ψ} p = abstr {pack Γ} {φ} {ψ} p
+
+⇒-elim : {Γ : List IForm} {φ ψ : IForm} →
+  Γ ⊢ φ ⇒ ψ              →
+  Γ ⊢ φ                  →
+  -----------------------
+  Γ ⊢ ψ
+⇒-elim {Γ} {φ} {ψ} p q =
+  _⊛_ {pack Γ} {(φ ⇒ ψ) ∧ φ} {ψ}
+  (ev φ ψ)
+  (pair {φ ⇒ ψ} {φ} {pack Γ} p q)
+
+∧-intro : {Γ : List IForm} {φ ψ : IForm} →
+  Γ ⊢ φ                   →
+  Γ ⊢ ψ                   →
+  -----------------------
+  Γ ⊢ φ ∧ ψ
+∧-intro {Γ} {φ} {ψ} p q = pair {φ} {ψ} {pack Γ} p q
+
+löb' : {Γ : List IForm} {φ : IForm} →
+  (▶ φ ∷ Γ) ⊢ φ
+  → -----------------------
+  Γ ⊢ φ
+löb' {Γ} {φ} p =
+  _⊛_ {pack Γ} {▶ φ ⇒ φ} {φ}
+  (löb {φ})
+  (abstr {pack Γ} {▶ φ} {φ} p)
+
+mon' : ∀ {Γ} {φ ψ : IForm} →
+  Γ ⊢ ▶ (φ ⇒ ψ) →
+  ----------------
+  Γ ⊢ ▶ φ ⇒ ▶ ψ
+mon' {Γ} {φ} {ψ} p =
+  let p' = _⊛_ {pack Γ ∧ ▶ φ} {▶ (φ ⇒ ψ) ∧ ▶ φ} {▶ ψ}
+               (_⊛_ {▶ (φ ⇒ ψ) ∧ ▶ φ} {▶ ((φ ⇒ ψ) ∧ φ)} {▶ ψ}
+                 (mon {(φ ⇒ ψ) ∧ φ} {ψ} (ev φ ψ))
+                 (▶-pres-∧ (φ ⇒ ψ) φ))
+               (map-∧ {pack Γ} {▶ φ} {▶ (φ ⇒ ψ)} {▶ φ} p (iId (▶ φ)))
+  in abstr {pack Γ} {▶ φ} {▶ ψ} p'
+
+next' : ∀ {Γ} {φ : IForm} →
+  Γ ⊢ φ →
+  ----------------
+  Γ ⊢ ▶ φ
+next' {Γ} {φ} p = _⊛_ {pack Γ} {φ} {▶ φ} (next φ) p
+
+▶-∧-distr' : ∀ {Γ} {φ ψ : IForm} →
+  Γ ⊢ ▶ (φ ∧ ψ) →
+  ----------------
+  Γ ⊢ ▶ φ ∧ ▶ ψ
+▶-∧-distr' {Γ} {φ} {ψ} p =
+  _⊛_ {pack Γ} {▶ (φ ∧ ψ)} {▶ φ ∧ ▶ ψ} (▶-∧-distr φ ψ) p
+
+▶-pres-∧' : ∀ {Γ} {φ ψ : IForm} →
+  Γ ⊢ ▶ φ ∧ ▶ ψ →
+  ----------------
+  Γ ⊢ ▶ (φ ∧ ψ)
+▶-pres-∧' {Γ} {φ} {ψ} p =
+  _⊛_ {pack Γ} {▶ φ ∧ ▶ ψ} {▶ (φ ∧ ψ)} (▶-pres-∧ φ ψ) p
+
+
+-- ▶' : List IForm → List IForm
+-- ▶' = List.map ▶
+
+-- ▶-pres-∧' : (Γ : List IForm) → pack (▶' Γ) ⟶ ▶ (pack Γ)
+-- ▶-pres-∧' [] = next i⊤
+-- ▶-pres-∧' (φ ∷ Γ) =
+--   _⊛_ {pack (▶' Γ) ∧ ▶ φ} {▶ (pack Γ) ∧ ▶ φ} {▶ (pack Γ ∧ φ)}
+--     (▶-pres-∧ (pack Γ) φ)
+--     (map-∧ {pack (▶' Γ)} {▶ φ} {▶ (pack Γ)} {▶ φ}
+--       (▶-pres-∧' Γ)
+--       (iId (▶ φ)))
+
+-- mon'' : ∀ {Γ} {φ : IForm} →
+--   Γ ⊢ φ →
+--   ----------------
+--   ▶' Γ ⊢ ▶ φ
+-- mon'' {Γ} {φ} p =
+--   _⊛_ {pack (▶' Γ)} {▶ (pack Γ)} {▶ φ}
+--     (mon {pack Γ} {φ} p)
+--     (▶-pres-∧' Γ)
+
+∈-liftT-⊗-distr' : ∀ {Γ} {ar} (T₁ T₂ : RelT ar) →
+  ∀ P s →
+  -----------------------------------------------------
+  Γ ⊢ ((s ∈ LiftT T₁ P) ∧ (s ∈ LiftT T₂ P)) ⇒ (s ∈ LiftT (T₁ ⊗ T₂) P)
+∈-liftT-⊗-distr' {Γ} T₁ T₂ P s =
+  axiom {Γ} {(s ∈ LiftT T₁ P) ∧ (s ∈ LiftT T₂ P)} {s ∈ LiftT (T₁ ⊗ T₂) P}
+    (∈-liftT-⊗-distr T₁ T₂ P s)
+
+-- ∈-liftT-⊗-distr' : ∀ {Γ} {ar} (T₁ T₂ : RelT ar) → ∀ P s →
+--   Γ ⊢ ((s ∈ LiftT T₁ P) ∧ (s ∈ LiftT T₂ P)) →
+--   -----------------------------------------------------
+--   Γ ⊢ (s ∈ LiftT (T₁ ⊗ T₂) P)
+-- ∈-liftT-⊗-distr' {Γ} T₁ T₂ P s p =
+--   _⊛_ {pack Γ} {(s ∈ LiftT T₁ P) ∧ (s ∈ LiftT T₂ P)} {s ∈ LiftT (T₁ ⊗ T₂) P}
+--     (∈-liftT-⊗-distr T₁ T₂ P s)
+--     p
 \end{code}
 
 \begin{code}
@@ -355,6 +549,13 @@ This will allow us to do recursion steps with the Löb rule.
   seq : (ts : Terms ar) → ▶ (ts ∈ LiftT T Seq) ⟶ (ts ∈ Seq)
   seq ts zero     p = Top-∈ ts
   seq ts (suc n)  p = p
+
+  seq' : {Γ : List IForm} →
+    (ts : Terms ar) →
+    ---------------------------------
+    Γ ⊢ ▶ (ts ∈ LiftT T Seq) ⇒ ts ∈ Seq
+  seq' {Γ} ts = axiom {Γ} {▶ (ts ∈ LiftT T Seq)} {ts ∈ Seq} (seq ts)
+
 \end{code}
 
 Compatible up-to techniques give us inclusions on every step of the
@@ -385,9 +586,14 @@ This will allow us to import them into recursive proofs.
   compat-∈-step F ts =
     mon {ts ∈ LiftT (CompatUpTo.tech F) Seq} {ts ∈ Seq} (compat-∈ F ts)
 
-  -- compat-∈-step' : (F : CompatUpTo T) (ts : Terms ar) →
-  --                  ▶ (ts ∈ Seq) ⟶  ▶ (CompatUpTo.trans F ts ∈ Seq)
-  -- compat-∈-step' = ?
+  compat-∈-step' : {Γ : List IForm} →
+    (F : CompatUpTo T)
+    (ts : Terms ar) →
+    -------------------
+    Γ ⊢ ▶ (ts ∈ LiftT (CompatUpTo.tech F) Seq) ⇒ ▶ (ts ∈ Seq)
+  compat-∈-step' {Γ} F ts =
+    axiom {Γ} {▶ (ts ∈ LiftT (CompatUpTo.tech F) Seq)} {▶ (ts ∈ Seq)}
+    (compat-∈-step F ts)
 \end{code}
 
 TODO:

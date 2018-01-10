@@ -145,56 +145,111 @@ C-∈ = compat-∈ CC (η s)
 
 Proof that s ≻ 0.
 \begin{code}
-unfold-C : s ∈ Tc ⟶ K 1 ⊕ s ∈ LiftT C Tc
-unfold-C n p = (s , p , refl)
+-- unfold-C : s ∈ Tc ⟶ K 1 ⊕ s ∈ LiftT C Tc
+-- unfold-C n p = (s , p , refl)
 
-lem₈ : i⊤ ⟶ s ∈ LiftT T₁ Tc
+-- lem₈ : i⊤ ⟶ s ∈ LiftT T₁ Tc
+-- lem₈ n _ = s≤s z≤n
+
+-- lem₇ : ▶ (s ≻0) ⟶ ▶ (s ∈ LiftT T₂ Tc)
+-- lem₇ = lem₇'
+--   where
+--     lem₇' : ▶ (s ≻0) ⟶ ▶ (K 1 ⊕ s ≻0)
+--     lem₇' = _⊛_ {▶ (s ≻0)}
+--                 {▶ (K 1 ⊕ s ∈ LiftT C Tc)}
+--                 {▶ (K 1 ⊕ s ≻0)}
+--             (compat-∈-step CC (η (K 1 ⊕ s)))
+--             (mon {s ≻0} {K 1 ⊕ s ∈ LiftT C Tc} unfold-C)
+
+-- lem₆ : ▶ (s ≻0) ⟶ ▶ (s ∈ LiftT T₁ Tc)
+-- lem₆ = _⊛_ {▶ (s ≻0)} {s ∈ LiftT T₁ Tc} {▶ (s ∈ LiftT T₁ Tc)}
+--        (next (s ∈ LiftT T₁ Tc))
+--        (meta-axiom {s ∈ LiftT T₁ Tc} lem₈ (▶ (s ≻0)))
+
+-- lem₅ : ▶ (s ≻0) ⟶ (▶ (s ∈ LiftT T₁ Tc)) ∧ (▶ (s ∈ LiftT T₂ Tc))
+-- lem₅ = pair {▶ (s ∈ LiftT T₁ Tc)} {▶ (s ∈ LiftT T₂ Tc)} {▶ (s ≻0)}
+--        lem₆ lem₇
+
+-- lem₄ : ▶ (s ≻0) ⟶ ▶ ((s ∈ LiftT T₁ Tc) ∧ (s ∈ LiftT T₂ Tc))
+-- lem₄ = _⊛_ {▶ (s ≻0)}
+--            {(▶ (s ∈ LiftT T₁ Tc)) ∧ (▶ (s ∈ LiftT T₂ Tc))}
+--            {▶ ((s ∈ LiftT T₁ Tc) ∧ (s ∈ LiftT T₂ Tc))}
+--        (▶-pres-∧ {s ∈ LiftT T₁ Tc} {s ∈ LiftT T₂ Tc})
+--        lem₅
+
+-- lem₃ : ▶ (s ≻0) ⟶ ▶ (s ∈ LiftT T Tc)
+-- lem₃ = _⊛_ {▶ (s ≻0)}
+--            {▶ ((s ∈ LiftT T₁ Tc) ∧ (s ∈ LiftT T₂ Tc))}
+--            {▶ (s ∈ LiftT T Tc)}
+--        (mon {(s ∈ LiftT T₁ Tc) ∧ (s ∈ LiftT T₂ Tc)}
+--             {s ∈ LiftT T Tc}
+--             (∈-liftT-⊗-distr T₁ T₂ Tc (η s)))
+--        lem₄
+
+-- lem₂ : ▶ (s ≻0) ⟶ (s ≻0)
+-- lem₂ = _⊛_ {▶ (s ≻0)}  {(s ≻0)}
+--        (seq (η s))
+--        lem₃
+
+Γ = [ ▶ (s ≻0) ]
+
+unfold-C-mor : s ∈ Tc ⟶ K 1 ⊕ s ∈ LiftT C Tc
+unfold-C-mor n p = (s , p , refl)
+
+unfold-C : Γ ⊢ s ∈ Tc ⇒ K 1 ⊕ s ∈ LiftT C Tc
+unfold-C = axiom {Γ} {s ∈ Tc} {(K 1 ⊕ s) ∈ LiftT C Tc} unfold-C-mor
+
+unfold-C-▶ : Γ ⊢ ▶ (s ∈ Tc) ⇒ ▶ ((K 1 ⊕ s) ∈ LiftT C Tc)
+unfold-C-▶ = mon' {Γ} {s ∈ Tc} {K 1 ⊕ s ∈ LiftT C Tc}
+              (next' {Γ} {s ∈ Tc ⇒ (K 1 ⊕ s) ∈ LiftT C Tc}
+                unfold-C)
+
+lem₈ : Γ ⊢ s ∈ LiftT T₁ Tc
 lem₈ n _ = s≤s z≤n
 
-lem₇ : ▶ (s ≻0) ⟶ ▶ (s ∈ LiftT T₂ Tc)
+lem₇ : Γ ⊢  ▶ (s ∈ LiftT T₂ Tc)
 lem₇ = lem₇'
   where
-    lem₇' : ▶ (s ≻0) ⟶ ▶ (K 1 ⊕ s ≻0)
-    lem₇' = _⊛_ {▶ (s ≻0)}
-                {▶ (K 1 ⊕ s ∈ LiftT C Tc)}
-                {▶ (K 1 ⊕ s ≻0)}
-            (compat-∈-step CC (η (K 1 ⊕ s)))
-            (mon {s ≻0} {K 1 ⊕ s ∈ LiftT C Tc} unfold-C)
+    lem₇' : Γ ⊢ ▶ (K 1 ⊕ s ≻0)
+    lem₇' = ⇒-elim {Γ} {▶ ((K 1 ⊕ s) ∈ LiftT C Tc)} {▶ ((K 1 ⊕ s) ∈ Tc)}
+            (compat-∈-step' {Γ} CC (η (K 1 ⊕ s)))
+            (⇒-elim {Γ} {▶ (s ∈ Tc)} {▶ ((K 1 ⊕ s) ∈ LiftT C Tc)}
+              unfold-C-▶ (proj [] (▶ (s ∈ Tc))))
 
-lem₆ : ▶ (s ≻0) ⟶ ▶ (s ∈ LiftT T₁ Tc)
-lem₆ = _⊛_ {▶ (s ≻0)} {s ∈ LiftT T₁ Tc} {▶ (s ∈ LiftT T₁ Tc)}
-       (next (s ∈ LiftT T₁ Tc))
-       (meta-axiom {s ∈ LiftT T₁ Tc} lem₈ (▶ (s ≻0)))
+lem₆ : Γ ⊢ ▶ (s ∈ LiftT T₁ Tc)
+lem₆ = next' {Γ} {s ∈ LiftT T₁ Tc} lem₈
 
-lem₅ : ▶ (s ≻0) ⟶ (▶ (s ∈ LiftT T₁ Tc)) ∧ (▶ (s ∈ LiftT T₂ Tc))
-lem₅ = pair {▶ (s ∈ LiftT T₁ Tc)} {▶ (s ∈ LiftT T₂ Tc)} {▶ (s ≻0)}
+lem₅ : Γ ⊢ (▶ (s ∈ LiftT T₁ Tc)) ∧ (▶ (s ∈ LiftT T₂ Tc))
+lem₅ = ∧-intro {Γ} {▶ (s ∈ LiftT T₁ Tc)} {▶ (s ∈ LiftT T₂ Tc)}
        lem₆ lem₇
 
-lem₄ : ▶ (s ≻0) ⟶ ▶ ((s ∈ LiftT T₁ Tc) ∧ (s ∈ LiftT T₂ Tc))
-lem₄ = _⊛_ {▶ (s ≻0)}
-           {(▶ (s ∈ LiftT T₁ Tc)) ∧ (▶ (s ∈ LiftT T₂ Tc))}
-           {▶ ((s ∈ LiftT T₁ Tc) ∧ (s ∈ LiftT T₂ Tc))}
-       (▶-pres-∧ {s ∈ LiftT T₁ Tc} {s ∈ LiftT T₂ Tc})
+lem₄ : Γ ⊢  ▶ ((s ∈ LiftT T₁ Tc) ∧ (s ∈ LiftT T₂ Tc))
+lem₄ = ▶-pres-∧' {Γ} {s ∈ LiftT T₁ Tc} {s ∈ LiftT T₂ Tc}
        lem₅
 
-lem₃ : ▶ (s ≻0) ⟶ ▶ (s ∈ LiftT T Tc)
-lem₃ = _⊛_ {▶ (s ≻0)}
-           {▶ ((s ∈ LiftT T₁ Tc) ∧ (s ∈ LiftT T₂ Tc))}
-           {▶ (s ∈ LiftT T Tc)}
-       (mon {(s ∈ LiftT T₁ Tc) ∧ (s ∈ LiftT T₂ Tc)}
-            {s ∈ LiftT T Tc}
-            (∈-liftT-⊗-distr T₁ T₂ Tc (η s)))
-       lem₄
+lem₃ : Γ ⊢ ▶ (s ∈ LiftT T Tc)
+lem₃ =
+  let q = mon' {Γ} {(s ∈ LiftT T₁ Tc) ∧ (s ∈ LiftT T₂ Tc)} {s ∈ LiftT (T₁ ⊗ T₂) Tc}
+          (next' {Γ} {(s ∈ LiftT T₁ Tc) ∧ (s ∈ LiftT T₂ Tc) ⇒ s ∈ LiftT (T₁ ⊗ T₂) Tc}
+            (∈-liftT-⊗-distr' {Γ} T₁ T₂ Tc (η s)))
+  in ⇒-elim {Γ} {▶ ((s ∈ LiftT T₁ Tc) ∧ (s ∈ LiftT T₂ Tc))} {▶ (s ∈ LiftT (T₁ ⊗ T₂) Tc)}
+     q lem₄
 
-lem₂ : ▶ (s ≻0) ⟶ (s ≻0)
-lem₂ = _⊛_ {▶ (s ≻0)} {▶ (s ∈ LiftT T Tc)} {(s ≻0)}
-       (seq (η s))
+lem₂ : Γ ⊢ (s ≻0)
+lem₂ =
+  let p = ⇒-elim {▶ (s ∈ LiftT T Tc) ∷ Γ} {▶ (s ∈ LiftT T Tc)} {s ∈ Tc}
+          (seq' {▶ (s ∈ LiftT T Tc) ∷ Γ} (η s))
+          (weaken {Γ} { ▶ (η s ∈-base LiftT T Tc)}
+            (▶ (s ∈ LiftT T Tc))
+            lem₃)
+  in cut {Γ} {▶ (s ∈ LiftT T Tc)} {s ≻0}
        lem₃
+       p
 
 -- Goal
 thm : ⊢ (s ≻0)
-thm = meta-löb {s ≻0} lem₂
+thm = löb' {[]} {φ = s ≻0} lem₂
 
 thm' : ∀ n → s at n > 0
-thm' = soundness (meta-i⊤ {s ≻0} thm)
+thm' = soundness (valid {s ≻0} thm)
 \end{code}
